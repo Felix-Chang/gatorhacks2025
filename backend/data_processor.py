@@ -8,6 +8,7 @@ import requests
 from typing import List, Tuple, Dict
 from datetime import datetime, timedelta
 import json
+import os
 
 
 class NYCEmissionsData:
@@ -167,43 +168,125 @@ class NYCEmissionsData:
         
         print("[NET] Fetching OpenAQ data for NYC...")
         
-        # OpenAQ API v2 endpoint
-        url = "https://api.openaq.org/v2/latest"
-        
-        params = {
-            'limit': 100,
-            'parameter': 'pm25',  # PM2.5 as proxy for emissions
-            'coordinates': f"{40.7128},{-74.0060}",  # NYC center
-            'radius': 50000,  # 50km radius
-        }
+        api_key = os.getenv('OPENAQ_API_KEY')
+        if api_key:
+            try:
+                sensors = self._fetch_v3_sensors(api_key)
+                measurements = self._fetch_v3_measurements(api_key, sensors)
+                self.openaq_cache = measurements
+                print(f"[OK] Fetched {len(measurements)} OpenAQ measurements (v3)")
+                return measurements
+            except Exception as exc:
+                print(f"[WARN] OpenAQ v3 fetch failed ({exc}); falling back to v2 if available")
         
         try:
-            response = requests.get(url, params=params, timeout=10)
+            stations = self._fetch_v2_latest()
+            self.openaq_cache = stations
+            print(f"[OK] Fetched {len(stations)} OpenAQ measurements (v2)")
+            return stations
+        except Exception as exc:
+            print(f"[ERROR] OpenAQ fetch failed: {exc}")
+            return []
+
+    def _fetch_v3_sensors(self, api_key: str) -> List[Dict]:
+        """Fetch sensor metadata near NYC using OpenAQ v3"""
+        url = "https://api.openaq.org/v3/locations"
+        params = {
+            'limit': 100,
+            'page': 1,
+            'offset': 0,
+            'sort': 'desc',
+            'coordinates': '40.7128,-74.0060',
+            'radius': 25000,
+            'parameters[]': ['pm25']
+        }
+        headers = {
+            'Accept': 'application/json',
+            'User-Agent': 'NYC-CO2-Simulator/1.0 (contact: support@example.com)',
+            'X-API-Key': api_key
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        sensors = []
+        for location in data.get('results', []):
+            for sensor in location.get('sensors', []):
+                if sensor.get('parameter', {}).get('name') == 'pm25':
+                    sensors.append({
+                        'sensor_id': sensor['id'],
+                        'location': location.get('name', 'Unknown'),
+                        'lat': location.get('coordinates', {}).get('latitude'),
+                        'lon': location.get('coordinates', {}).get('longitude'),
+                    })
+        return sensors
+
+    def _fetch_v3_measurements(self, api_key: str, sensors: List[Dict]) -> List[Dict]:
+        """Fetch recent measurements for the provided sensors"""
+        headers = {
+            'Accept': 'application/json',
+            'User-Agent': 'NYC-CO2-Simulator/1.0 (contact: support@example.com)',
+            'X-API-Key': api_key
+        }
+        measurements = []
+        for sensor in sensors:
+            sensor_id = sensor['sensor_id']
+            url = f"https://api.openaq.org/v3/sensors/{sensor_id}/measurements"
+            params = {
+                'limit': 1,
+                'page': 1,
+                'order_by': 'datetime',
+                'sort': 'desc'
+            }
+            response = requests.get(url, params=params, headers=headers, timeout=10)
             response.raise_for_status()
             data = response.json()
-            
-            stations = []
-            if 'results' in data:
-                for result in data['results']:
-                    if 'coordinates' in result and 'measurements' in result:
-                        coord = result['coordinates']
-                        for measurement in result['measurements']:
-                            if measurement['parameter'] == 'pm25':
-                                stations.append({
-                                    'lat': coord['latitude'],
-                                    'lon': coord['longitude'],
-                                    'value': measurement['value'],
-                                    'unit': measurement['unit'],
-                                    'location': result.get('location', 'Unknown')
-                                })
-            
-            self.openaq_cache = stations
-            print(f"[OK] Fetched {len(stations)} OpenAQ measurements")
-            return stations
-            
-        except Exception as e:
-            print(f"[ERROR] OpenAQ fetch failed: {e}")
-            return []
+            for result in data.get('results', []):
+                value = result.get('value')
+                if value is None:
+                    continue
+                measurements.append({
+                    'lat': sensor['lat'],
+                    'lon': sensor['lon'],
+                    'value': value,
+                    'unit': result.get('parameter', {}).get('units', 'µg/m³'),
+                    'location': sensor['location']
+                })
+        return measurements
+
+    def _fetch_v2_latest(self) -> List[Dict]:
+        """Fetch measurements using legacy OpenAQ v2 endpoint"""
+        url = "https://api.openaq.org/v2/latest"
+        params = {
+            'limit': 100,
+            'page': 1,
+            'offset': 0,
+            'sort': 'desc',
+            'parameter': 'pm25',
+            'coordinates': f"{40.7128},{-74.0060}",
+            'radius': 25000,
+        }
+        headers = {
+            'Accept': 'application/json',
+            'User-Agent': 'NYC-CO2-Simulator/1.0 (contact: support@example.com)'
+        }
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        stations = []
+        if 'results' in data:
+            for result in data['results']:
+                if 'coordinates' in result and 'measurements' in result:
+                    coord = result['coordinates']
+                    for measurement in result['measurements']:
+                        if measurement['parameter'] == 'pm25':
+                            stations.append({
+                                'lat': coord['latitude'],
+                                'lon': coord['longitude'],
+                                'value': measurement['value'],
+                                'unit': measurement['unit'],
+                                'location': result.get('location', 'Unknown')
+                            })
+        return stations
     
     def _blend_openaq_data(self, grid: np.ndarray, lats: np.ndarray, 
                            lons: np.ndarray, openaq_data: List[Dict]) -> np.ndarray:
