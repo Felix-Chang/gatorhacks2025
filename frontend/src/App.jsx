@@ -88,7 +88,7 @@ const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, un
 
   // Dynamic marker radius based on zoom level
   const getMarkerRadius = (zoom) => {
-    const baseRadius = view === 'difference' ? 5 : 7
+    const baseRadius = 7 // Same base radius for all views
     // Scale radius based on zoom: more zoom = bigger markers
     // At zoom 11 (default): base radius
     // At zoom 15+: much larger markers
