@@ -1097,3 +1097,20 @@ body::after {
     background: rgba(59, 130, 246, 0.3);
     color: white;
 }
+
+/* Smooth marker scaling animation for Leaflet CircleMarkers */
+/* Using a smooth easing function that matches Leaflet's default zoom animation */
+.leaflet-zoom-animated {
+    will-change: transform;
+}
+
+.leaflet-interactive {
+    transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+    will-change: r, stroke-width;
+}
+
+/* Specific styling for circle markers during zoom */
+svg.leaflet-zoom-animated path.leaflet-interactive {
+    transition: r 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                stroke-width 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}

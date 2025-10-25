@@ -1,6 +1,6 @@
-﻿import { useState, useEffect, useMemo, useCallback, useDeferredValue, memo, useRef } from 'react'
+﻿import { useState, useEffect, useMemo, useCallback, useDeferredValue, memo, useRef, useTransition } from 'react'
 import axios from 'axios'
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import Logo from './Logo'
@@ -52,9 +52,22 @@ const computeStats = (data) => {
 
 const MAX_MARKERS_TO_RENDER = 800
 
+// Component to handle zoom events smoothly
+function ZoomHandler({ onZoomChange }) {
+  useMapEvents({
+    zoom: (e) => {
+      // Update zoom level during animation for smooth marker scaling
+      const newZoom = e.target.getZoom()
+      onZoomChange(newZoom)
+    },
+  })
+  return null
+}
+
 const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, unitSystem }) {
   const [zoomLevel, setZoomLevel] = useState(11)
   const [mapCenter, setMapCenter] = useState([40.7128, -74.006])
+  const [isMapReady, setIsMapReady] = useState(false)
   
   const points = useMemo(() => {
     if (!data || data.length === 0) return []
@@ -87,20 +100,15 @@ const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, un
   const markerRadius = getMarkerRadius(zoomLevel)
 
   return (
-    <MapContainer 
-      center={mapCenter} 
-      zoom={zoomLevel} 
-      className="map" 
-      whenReady={(map) => {
-        // Track zoom and center changes
-        map.target.on('zoomend', () => {
-          setZoomLevel(map.target.getZoom())
-        })
-        map.target.on('moveend', () => {
-          setMapCenter(map.target.getCenter())
-        })
-      }}
+    <MapContainer
+      center={mapCenter}
+      zoom={zoomLevel}
+      className="map"
+      zoomAnimation={true}
+      zoomAnimationThreshold={4}
     >
+      <ZoomHandler onZoomChange={setZoomLevel} />
+
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
