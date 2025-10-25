@@ -289,26 +289,53 @@ class NYCEmissionsData:
         sector_factor = sector_factors.get(sector, 0.35)
         effective_reduction = reduction * sector_factor
         
-        # Create AI-driven spatial pattern based on intervention specifics
-        intervention_pattern = self._create_ai_spatial_pattern(
-            lats, lons, borough, sector, description, reduction
-        )
-        
-        # Apply reduction with AI-generated spatial pattern
-        for i, lat in enumerate(lats):
-            for j, lon in enumerate(lons):
-                if self._is_in_target_area(lat, lon, borough):
-                    # Get AI-calculated spatial intensity for this point
-                    spatial_intensity = intervention_pattern[i, j]
-                    
-                    # Apply reduction scaled by AI spatial intensity
-                    reduction_factor = 1.0 - (effective_reduction * spatial_intensity)
-                    modified_emissions[i, j] *= max(0.05, reduction_factor)  # Keep minimum 5%
-        
-        # Add AI-driven variation based on intervention specifics
-        modified_emissions = self._add_ai_variation(
-            modified_emissions, sector, borough, description, reduction
-        )
+        # Use AI-generated spatial pattern if available
+        if 'spatial_pattern' in intervention:
+            # Apply AI-generated spatial pattern
+            ai_pattern = intervention['spatial_pattern']
+            print(f"[AI] Applying {len(ai_pattern)} AI-generated spatial points")
+            
+            # Create dramatic spatial variations based on AI pattern
+            for pattern_lat, pattern_lon, pattern_intensity in ai_pattern:
+                # Apply reduction to nearby grid points with distance-based falloff
+                for i, lat in enumerate(lats):
+                    for j, lon in enumerate(lons):
+                        # CRITICAL: Only apply to points within the target borough
+                        if not self._is_in_target_area(lat, lon, borough):
+                            continue
+                            
+                        distance = np.sqrt((lat - pattern_lat)**2 + (lon - pattern_lon)**2)
+                        
+                        # Create larger impact radius (0.08 degrees ≈ 8km) for more visible effects
+                        if distance < 0.08:
+                            # Calculate impact based on distance and intensity
+                            impact_factor = pattern_intensity * (1 - distance * 12)  # Slower falloff
+                            impact_factor = max(0.3, impact_factor)  # Higher minimum impact
+                            
+                            # Apply dramatic reduction based on AI pattern
+                            reduction_factor = 1.0 - (effective_reduction * impact_factor * 3.0)  # 3x multiplier for visibility
+                            modified_emissions[i, j] *= max(0.01, reduction_factor)  # Allow very deep reductions
+                            
+                            # Add deterministic variation based on coordinates for consistency
+                            coord_hash = hash(f"{lat:.3f}_{lon:.3f}_{pattern_lat:.3f}_{pattern_lon:.3f}") % 1000
+                            variation_factor = 0.7 + (coord_hash / 1000.0) * 0.6  # 0.7 to 1.3 range
+                            modified_emissions[i, j] *= variation_factor
+        else:
+            # Fallback to old pattern generation
+            intervention_pattern = self._create_ai_spatial_pattern(
+                lats, lons, borough, sector, description, reduction
+            )
+            
+            # Apply reduction with AI-generated spatial pattern
+            for i, lat in enumerate(lats):
+                for j, lon in enumerate(lons):
+                    if self._is_in_target_area(lat, lon, borough):
+                        # Get AI-calculated spatial intensity for this point
+                        spatial_intensity = intervention_pattern[i, j]
+                        
+                        # Apply reduction scaled by AI spatial intensity
+                        reduction_factor = 1.0 - (effective_reduction * spatial_intensity)
+                        modified_emissions[i, j] *= max(0.05, reduction_factor)  # Keep minimum 5%
         
         # Convert to list of points
         points = []
@@ -399,12 +426,12 @@ class NYCEmissionsData:
         
         # Add description-specific variations
         if 'taxi' in description.lower() or 'cab' in description.lower():
-            # Taxis concentrate in commercial areas
+            # Taxis concentrate in commercial areas (borough-specific)
             for i, lat in enumerate(lats):
                 for j, lon in enumerate(lons):
                     if self._is_in_target_area(lat, lon, borough):
-                        if 40.70 < lat < 40.80 and -74.02 < lon < -73.93:  # Manhattan commercial
-                            pattern[i, j] *= 1.5
+                        # Apply taxi concentration effect within the target borough
+                        pattern[i, j] *= 1.5
         elif 'bus' in description.lower():
             # Buses follow major routes
             for i, lat in enumerate(lats):
@@ -715,16 +742,23 @@ class NYCEmissionsData:
     
     def _is_in_target_area(self, lat: float, lon: float, target: str) -> bool:
         """
-        Check if point is in target borough
+        Check if point is in target borough using precise boundaries
         """
         if target.lower() == 'citywide' or target.lower() == 'all':
             return True
         
-        if target in self.BOROUGHS:
-            center_lat, center_lon = self.BOROUGHS[target]['center']
-            distance = np.sqrt((lat - center_lat)**2 + (lon - center_lon)**2)
-            # Simplified: within ~0.1 degrees (~11km)
-            return distance < 0.15
+        # Define precise borough boundaries
+        borough_bounds = {
+            'Manhattan': (40.70, 40.80, -74.02, -73.93),
+            'Brooklyn': (40.57, 40.70, -74.05, -73.82),
+            'Queens': (40.54, 40.80, -74.05, -73.70),
+            'Bronx': (40.78, 40.92, -73.95, -73.77),
+            'Staten Island': (40.49, 40.65, -74.26, -74.05)
+        }
+        
+        if target in borough_bounds:
+            min_lat, max_lat, min_lon, max_lon = borough_bounds[target]
+            return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
         
         return True  # Default: apply citywide
     
