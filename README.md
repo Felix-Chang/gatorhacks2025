@@ -18,6 +18,25 @@ This application uses artificial intelligence to parse natural language prompts 
 
 ## 🚀 Quick Start
 
+### Cloning the Repo
+
+Git Large File Storage (LFS) is required to handle large datasets or model files in this project. Install Git LFS:
+
+**Windows**
+```
+git lfs install
+```
+
+**macOS**
+```
+brew install git-lfs
+```
+
+Then, clone the repository:
+```
+git clone https://github.com/Felix-Chang/gatorhacks2025.git
+```
+
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
