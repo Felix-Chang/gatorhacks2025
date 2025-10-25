@@ -53,6 +53,8 @@ const computeStats = (data) => {
 const MAX_MARKERS_TO_RENDER = 800
 
 const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, unitSystem }) {
+  const [zoomLevel, setZoomLevel] = useState(11)
+  
   const points = useMemo(() => {
     if (!data || data.length === 0) return []
     if (data.length <= MAX_MARKERS_TO_RENDER) return data
@@ -70,10 +72,32 @@ const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, un
     )
   }
 
-  const markerRadius = view === 'difference' ? 5 : 7
+  // Dynamic marker radius based on zoom level
+  const getMarkerRadius = (zoom) => {
+    const baseRadius = view === 'difference' ? 5 : 7
+    // Scale radius based on zoom: more zoom = bigger markers
+    // At zoom 11 (default): base radius
+    // At zoom 15+: much larger markers
+    // At zoom 8-: smaller markers
+    const zoomFactor = Math.pow(1.5, zoom - 11) // Increased from 1.3 to 1.5 for more aggressive scaling
+    return Math.max(3, Math.min(35, Math.round(baseRadius * zoomFactor))) // Increased max from 25 to 35
+  }
+
+  const markerRadius = getMarkerRadius(zoomLevel)
 
   return (
-    <MapContainer center={[40.7128, -74.006]} zoom={11} className="map" key={view}>
+    <MapContainer 
+      center={[40.7128, -74.006]} 
+      zoom={11} 
+      className="map" 
+      key={view}
+      whenReady={(map) => {
+        // Track zoom changes
+        map.target.on('zoomend', () => {
+          setZoomLevel(map.target.getZoom())
+        })
+      }}
+    >
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
