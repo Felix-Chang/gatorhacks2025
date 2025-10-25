@@ -1,0 +1,163 @@
+/* Draggable Conversation Sidebar - Always Floats Over Content */
+
+.conversation-sidebar.draggable {
+  position: fixed !important;
+  z-index: 1000;
+  cursor: move;
+  user-select: none;
+  transition: none; /* Disable transitions during drag */
+  /* Ensure it floats over everything */
+  pointer-events: auto;
+}
+
+.conversation-sidebar.dragging {
+  opacity: 0.9;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  transform: scale(1.02);
+}
+
+/* Remove all minimize-related styles */
+.conversation-sidebar.minimized {
+  /* Minimize feature removed */
+}
+
+.conversation-sidebar.minimized .conversation-list,
+.conversation-sidebar.minimized .conversation-actions {
+  /* Minimize feature removed */
+}
+
+.conversation-sidebar.minimized .conversation-header {
+  /* Minimize feature removed */
+}
+
+.conversation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  cursor: move;
+  user-select: none;
+}
+
+.conversation-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.conversation-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-control-btn {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+}
+
+.header-control-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.header-control-btn:active {
+  transform: translateY(0);
+}
+
+.drag-handle {
+  cursor: move;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  user-select: none;
+}
+
+/* Unit selector dropdown */
+.unit-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+}
+
+.unit-selector-label {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.unit-selector select {
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  min-width: 100px;
+}
+
+.unit-selector select:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(30, 41, 59, 0.9);
+}
+
+.unit-selector select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.unit-selector select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 0.5rem;
+}
+
+/* Smooth transitions when not dragging */
+.conversation-sidebar:not(.dragging) {
+  transition: width 0.3s ease, height 0.3s ease, opacity 0.3s ease;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .conversation-sidebar.draggable {
+    position: fixed;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    max-height: 60vh;
+  }
+  
+  .conversation-sidebar.minimized {
+    max-height: 60px;
+  }
+  
+  .drag-handle {
+    display: none; /* Can't drag on mobile, just minimize */
+  }
+}
+

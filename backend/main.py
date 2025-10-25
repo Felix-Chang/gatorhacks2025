@@ -18,7 +18,7 @@ from ai_processor import AIPromptProcessor
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="NYC COâ‚‚ Simulation API")
+app = FastAPI(title="CO₂UNT API", description="AI-Powered Climate Impact Simulator for NYC")
 
 # CORS middleware for frontend communication
 app.add_middleware(
@@ -53,6 +53,7 @@ class SimulationResponse(BaseModel):
     grid: List[GridPoint]
     intervention: Dict
     metadata: Dict
+    statistics: Optional[Dict] = None  # Real emissions calculations
 
 
 @app.get("/")
@@ -60,7 +61,8 @@ async def root():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "NYC COâ‚‚ Simulation API",
+        "service": "CO₂UNT API",
+        "app_name": "CO₂UNT - NYC Climate Impact Simulator",
         "version": "1.0.0"
     }
 
@@ -144,10 +146,17 @@ async def simulate_intervention(request: SimulationRequest):
             "timestamp": emissions_data.get_last_update_time()
         }
         
+        # Extract real emissions statistics if available
+        statistics = None
+        if 'real_emissions' in intervention:
+            statistics = intervention['real_emissions']
+            print(f"[API] Including real emissions statistics in response")
+        
         return {
             "grid": grid_points,
             "intervention": intervention,
-            "metadata": metadata
+            "metadata": metadata,
+            "statistics": statistics
         }
         
     except Exception as e:
@@ -173,7 +182,8 @@ async def get_openaq_stations():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    print(f"[START] Starting NYC COâ‚‚ Simulation API on port {port}")
+    print(f"[START] Starting CO2UNT API on port {port}")
+    print(f"[INFO] CO2UNT - AI-Powered Climate Impact Simulator")
     print(f"[URL] API Documentation: http://localhost:{port}/docs")
     uvicorn.run(app, host="0.0.0.0", port=port)
 

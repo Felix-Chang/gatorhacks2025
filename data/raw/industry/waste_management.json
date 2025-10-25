@@ -1,0 +1,66 @@
+{
+  "waste_generation": {
+    "annual_tons": {
+      "total": 14000000,
+      "residential": 3200000,
+      "commercial": 5600000,
+      "construction_demolition": 5200000
+    },
+    "daily_tons": 38356,
+    "per_capita_lbs_per_day": 4.5
+  },
+  "disposal_methods": {
+    "landfill_percentage": 0.65,
+    "recycling_percentage": 0.17,
+    "composting_percentage": 0.03,
+    "waste_to_energy_percentage": 0.15
+  },
+  "collection_fleet": {
+    "total_vehicles": 2100,
+    "diesel_trucks": 1850,
+    "cng_trucks": 200,
+    "electric_trucks": 50,
+    "daily_miles_per_truck": 80
+  },
+  "transfer_stations": [
+    {
+      "name": "Hamilton Ave Marine Transfer Station",
+      "location": {"lat": 40.6723, "lon": -74.0088},
+      "borough": "Brooklyn",
+      "annual_capacity_tons": 500000
+    },
+    {
+      "name": "59th Street Marine Transfer Station",
+      "location": {"lat": 40.7614, "lon": -73.9642},
+      "borough": "Manhattan",
+      "annual_capacity_tons": 400000
+    },
+    {
+      "name": "91st Street Marine Transfer Station",
+      "location": {"lat": 40.7831, "lon": -73.9442},
+      "borough": "Manhattan",
+      "annual_capacity_tons": 350000
+    }
+  ],
+  "recycling_facilities": [
+    {
+      "name": "Sims Municipal Recycling",
+      "location": {"lat": 40.7282, "lon": -73.9442},
+      "borough": "Brooklyn",
+      "annual_capacity_tons": 700000,
+      "materials": ["metal", "glass", "plastic", "paper"]
+    }
+  ],
+  "emissions": {
+    "landfill_methane_tons_co2e_per_ton_waste": 0.5,
+    "collection_diesel_kg_co2_per_mile": 2.7,
+    "waste_to_energy_kg_co2_per_ton": 500,
+    "recycling_avoided_emissions_kg_co2_per_ton": 200
+  },
+  "targets": {
+    "zero_waste_by_2030": true,
+    "recycling_rate_target_2030": 0.70,
+    "organic_waste_diversion_target_2030": 0.90
+  }
+}
+

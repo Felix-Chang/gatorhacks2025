@@ -1,0 +1,56 @@
+{
+  "power_plants": [
+    {
+      "name": "Astoria Generating Station",
+      "location": {
+        "lat": 40.7769,
+        "lon": -73.924
+      },
+      "capacity_mw": 1300,
+      "fuel_type": "natural_gas",
+      "annual_generation_mwh": 5000000
+    },
+    {
+      "name": "Ravenswood Generating Station",
+      "location": {
+        "lat": 40.7642,
+        "lon": -73.9542
+      },
+      "capacity_mw": 2480,
+      "fuel_type": "natural_gas",
+      "annual_generation_mwh": 10000000
+    }
+  ],
+  "waste_facilities": [
+    {
+      "name": "Waste Management - Staten Island",
+      "location": {
+        "lat": 40.5795,
+        "lon": -74.1502
+      },
+      "type": "transfer_station",
+      "annual_tons": 500000
+    },
+    {
+      "name": "Sims Municipal Recycling",
+      "location": {
+        "lat": 40.7282,
+        "lon": -73.9442
+      },
+      "type": "recycling",
+      "annual_tons": 700000
+    }
+  ],
+  "manufacturing": [
+    {
+      "name": "Brooklyn Navy Yard",
+      "location": {
+        "lat": 40.7038,
+        "lon": -73.9725
+      },
+      "type": "mixed_manufacturing",
+      "employees": 10000,
+      "area_acres": 300
+    }
+  ]
+}

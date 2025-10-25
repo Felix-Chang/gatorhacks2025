@@ -1,0 +1,62 @@
+{
+  "facilities": {
+    "Port_Newark": {
+      "name": "Port Newark Container Terminal",
+      "location": {
+        "lat": 40.6892,
+        "lon": -74.1502
+      },
+      "type": "container",
+      "annual_teu": 3500000,
+      "area_acres": 2500
+    },
+    "Port_Elizabeth": {
+      "name": "Port Elizabeth Marine Terminal",
+      "location": {
+        "lat": 40.6659,
+        "lon": -74.1542
+      },
+      "type": "container",
+      "annual_teu": 2000000,
+      "area_acres": 1200
+    },
+    "Red_Hook": {
+      "name": "Red Hook Container Terminal",
+      "location": {
+        "lat": 40.6693,
+        "lon": -74.0088
+      },
+      "type": "container",
+      "annual_teu": 400000,
+      "area_acres": 80
+    },
+    "Brooklyn_Cruise": {
+      "name": "Brooklyn Cruise Terminal",
+      "location": {
+        "lat": 40.6723,
+        "lon": -74.0177
+      },
+      "type": "cruise",
+      "annual_passengers": 500000,
+      "area_acres": 12
+    },
+    "Staten_Island_Ferry": {
+      "name": "Staten Island Ferry",
+      "location": {
+        "lat": 40.6435,
+        "lon": -74.0732
+      },
+      "type": "passenger",
+      "annual_passengers": 25000000,
+      "daily_trips": 117
+    }
+  },
+  "cargo_volumes": {
+    "2023": {
+      "total_tons": 142000000,
+      "container_teu": 7500000,
+      "vehicle_units": 700000,
+      "bulk_tons": 15000000
+    }
+  }
+}

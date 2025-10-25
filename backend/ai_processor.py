@@ -4,7 +4,7 @@ Uses OpenAI API to analyze prompts and generate realistic spatial predictions
 based on actual NYC data and geographic intelligence
 """
 
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List, Tuple, Any
 import json
 import re
 import numpy as np
@@ -18,7 +18,7 @@ class AIPromptProcessor:
     """
     
     BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island']
-    SECTORS = ['transport', 'buildings', 'industry', 'energy', 'all']
+    SECTORS = ['transport', 'buildings', 'industry', 'energy', 'nature']
     
     # Real NYC geographic data for AI analysis
     NYC_LANDMARKS = {
@@ -206,9 +206,9 @@ Be specific about NYC landmarks, neighborhoods, and geographic features."""
                 (-73.9857, 40.6501, 'Park Slope', 0.6),  # Residential
             ],
             'Queens': [
-                (-73.9857, 40.7505, 'JFK Airport', 1.0),  # Major airport
-                (-73.9857, 40.7505, 'LaGuardia Airport', 0.9),  # Major airport
-                (-73.9857, 40.7505, 'Queens Plaza', 0.7),  # Transit hub
+                (-73.7781, 40.6413, 'JFK Airport', 1.0),  # Major airport - CORRECT coordinates
+                (-73.8740, 40.7769, 'LaGuardia Airport', 0.9),  # Major airport - CORRECT coordinates
+                (-73.9400, 40.7505, 'Queens Plaza', 0.7),  # Transit hub
             ],
             'Bronx': [
                 (-73.9857, 40.8508, 'Yankee Stadium', 0.7),  # Major venue
@@ -437,80 +437,322 @@ Be specific about NYC landmarks, neighborhoods, and geographic features."""
         }
         return bounds.get(borough, (40.49, 40.92, -74.26, -73.70))
     
+    def _is_unrelated_prompt(self, prompt_lower: str) -> bool:
+        """Check if prompt is unrelated to climate/emissions interventions"""
+        # Action verbs - MUST contain at least one to be valid
+        action_verbs = [
+            'reduce', 'increase', 'cut', 'lower', 'decrease', 'add', 'expand',
+            'install', 'convert', 'implement', 'deploy', 'phase out', 'remove',
+            'ban', 'boost', 'grow', 'invest'
+        ]
+        
+        # Sector keywords - specific things that can be changed
+        sector_keywords = [
+            'emission', 'carbon', 'co2', 'taxi', 'bus', 'vehicle', 'car', 'transport',
+            'flight', 'plane', 'airport', 'aviation', 'building', 'solar', 'panel',
+            'roof', 'energy', 'power', 'grid', 'electric', 'electricity', 'tree',
+            'plant', 'park', 'industrial', 'factory', 'pollution', 'waste',
+            'greenhouse', 'fuel', 'ev', 'sustainable', 'recycle', 'jfk', 'laguardia',
+            'lga', 'manhattan', 'brooklyn', 'queens', 'bronx', 'heat', 'hvac',
+            'wind', 'renewable', 'fossil', 'coal', 'gas', 'oil', 'train', 'subway',
+            'rail', 'bike', 'traffic', 'congestion'
+        ]
+        
+        # Check if prompt contains BOTH action verb AND sector keyword
+        has_action = any(verb in prompt_lower for verb in action_verbs)
+        has_sector = any(keyword in prompt_lower for keyword in sector_keywords)
+        
+        # VERY STRICT: Must have BOTH action AND sector, OR just be specific enough
+        # Examples that should pass:
+        # - "reduce emissions" (action + sector) ✓
+        # - "add solar panels" (action + sector) ✓
+        # - "JFK emissions" (specific location + sector) ✓
+        # 
+        # Examples that should fail:
+        # - "climate" (no action, no specific sector) ✗
+        # - "climate 30%" (no action, no specific sector) ✗
+        # - "environment" (too vague) ✗
+        
+        # If no action verb AND no specific sector, it's unrelated
+        if not has_action and not has_sector:
+            return True
+        
+        # If has number/percent but no action or sector, it's unrelated
+        has_number = any(char.isdigit() or char == '%' in prompt_lower for char in prompt_lower)
+        if has_number and not has_action and not has_sector:
+            return True
+        
+        # Vague terms that need more context
+        vague_only_terms = ['climate', 'environment', 'green', 'sustainable']
+        is_only_vague = any(term in prompt_lower for term in vague_only_terms) and not has_action and not has_sector
+        if is_only_vague:
+            return True
+        
+        # Even if it has some keywords, check if it's clearly unrelated
+        unrelated_patterns = [
+            'weather', 'temperature', 'rain', 'snow', 'forecast', 'sunny', 'cloudy',
+            'restaurant', 'food', 'eat', 'drink', 'coffee', 'pizza', 'burger', 'candy', 'gummy',
+            'movie', 'show', 'entertainment', 'sport', 'game', 'play', 'fun',
+            'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 'goodbye',
+            'joke', 'funny', 'meme', 'story', 'poem', 'song', 'music',
+            'shop', 'store', 'buy', 'sell', 'price', 'cost',
+            'people', 'person', 'friend', 'family', 'love', 'hate'
+        ]
+        
+        # If it has unrelated patterns and weak/no climate context, it's unrelated
+        has_unrelated = any(pattern in prompt_lower for pattern in unrelated_patterns)
+        if has_unrelated and not (has_action or has_sector):
+            return True
+        
+        # Single letter or very short nonsense (< 3 chars)
+        if len(prompt_lower.strip()) < 3:
+            return True
+        
+        # Short prompts (< 8 chars) with no clear action or sector
+        if len(prompt_lower.strip()) < 8 and not (has_action or has_sector):
+            return True
+        
+        return False
+    
     def _parse_with_enhanced_rules(self, prompt: str) -> Dict:
-        """
-        Enhanced rule-based parsing with better spatial pattern generation
-        """
+        """Parse natural language prompt into structured intervention details"""
         prompt_lower = prompt.lower()
         
-        # Extract borough
-        borough = "citywide"
-        for b in self.BOROUGHS:
-            if b.lower() in prompt_lower:
-                borough = b
-                break
-        
-        # Extract sector
-        sector = "transport"  # Default
-        sector_keywords = {
-            'transport': ['taxi', 'cab', 'bus', 'car', 'vehicle', 'ev', 'traffic', 'transport'],
-            'buildings': ['building', 'solar', 'panel', 'heating', 'cooling', 'hvac', 'insulation', 'roof'],
-            'industry': ['industry', 'industrial', 'factory', 'manufacturing'],
-            'energy': ['energy', 'power', 'electricity', 'grid']
-        }
-        
-        for sector_name, keywords in sector_keywords.items():
-            if any(keyword in prompt_lower for keyword in keywords):
-                sector = sector_name
-                break
-        
-        # Extract percentage
-        reduction_percent = 20.0  # Default
-        
-        # Look for explicit percentages
-        percent_match = re.search(r'(\d+)\s*%', prompt)
-        if percent_match:
-            reduction_percent = float(percent_match.group(1))
-            # Adjust if it's a conversion rather than direct reduction
-            if 'convert' in prompt_lower or 'replace' in prompt_lower:
-                reduction_percent *= 0.8  # Converting X% of fleet reduces emissions by ~0.8X%
-        else:
-            # Look for implicit amounts
-            if 'all' in prompt_lower:
-                reduction_percent = 50
-            elif 'half' in prompt_lower:
-                reduction_percent = 25
-            elif 'double' in prompt_lower or 'increase' in prompt_lower:
-                reduction_percent = 30
-        
-        # Cap at reasonable values
-        reduction_percent = min(reduction_percent, 60)
-        
-        # Generate description
-        description = self._generate_description(sector, borough, reduction_percent)
-        
-        # Generate spatial pattern
-        spatial_pattern = self._generate_spatial_pattern_from_ai({
-            "borough": borough,
-            "sector": sector,
-            "description": description
-        }, prompt)
-        
+        # Check if prompt is actually related to climate/emissions
+        if self._is_unrelated_prompt(prompt_lower):
+            return {
+                "borough": "citywide",
+                "sector": "none",
+                "reduction_percent": 0,
+                "direction": "none",
+                "description": "Unrelated query - no climate impact",
+                "is_unrelated": True,
+                "spatial_pattern": []
+            }
+
+        borough = self._extract_borough(prompt_lower)
+        scenario = self._extract_scenario(prompt_lower)
+        percent = self._extract_percentage(prompt_lower, scenario)
+
+        targets = scenario.get("targets", [])
         intervention = {
             "borough": borough,
-            "sector": sector,
-            "reduction_percent": reduction_percent,
-            "description": description,
-            "spatial_pattern": spatial_pattern,
-            "ai_analysis": f"Rule-based analysis: {sector} intervention in {borough}",
-            "spatial_reasoning": f"Pattern generated based on {sector} characteristics in {borough}",
-            "real_world_factors": f"Considerations for {sector} implementation in {borough}"
+            "sector": scenario["sector"],
+            "subsector": scenario.get("subsector"),
+            "direction": scenario["direction"],
+            "magnitude_percent": percent,
+            "targets": targets,
+            "description": self._generate_description(scenario["sector"], borough, percent, scenario["direction"], targets)
         }
-        
-        print(f"[OK] Enhanced rule-based parsing: {intervention['description']}")
+
+        reduction_percent = percent if intervention["direction"] == "decrease" else -percent
+        intervention["reduction_percent"] = reduction_percent
+        spatial_pattern = self._generate_spatial_pattern_from_ai({
+            "borough": borough,
+            "sector": intervention["sector"],
+            "description": intervention["description"],
+            "reduction_percent": reduction_percent
+        }, prompt)
+
+        intervention["spatial_pattern"] = spatial_pattern
+
+        print(f"[OK] Parsed scenario: {intervention['description']}")
         return intervention
     
-    def _generate_description(self, sector: str, borough: str, percent: float) -> str:
-        """Generate human-readable description"""
+    def _generate_description(self, sector: str, borough: str, percent: float, direction: str, targets: Optional[List[str]] = None) -> str:
         location = borough if borough != "citywide" else "NYC"
-        return f"{percent:.0f}% {sector} emission reduction in {location}"
+        verbs = {
+            'decrease': 'reduction',
+            'increase': 'increase'
+        }
+        action = verbs.get(direction, 'change')
+        target = targets[0] if targets else sector
+        return f"{percent:.0f}% {target} {action} in {location}"
+
+    def _extract_borough(self, prompt_lower: str) -> str:
+        # Check for specific airport mentions first
+        if 'jfk' in prompt_lower or 'john f kennedy' in prompt_lower or 'kennedy airport' in prompt_lower:
+            return "Queens"  # JFK is in Queens
+        if 'lga' in prompt_lower or 'laguardia' in prompt_lower or 'la guardia' in prompt_lower:
+            return "Queens"  # LaGuardia is in Queens
+        if 'newark' in prompt_lower or 'ewr' in prompt_lower:
+            return "citywide"  # Newark is in NJ but affects NYC
+        
+        # Check for boroughs
+        for borough in self.BOROUGHS:
+            if borough.lower() in prompt_lower:
+                return borough
+        return "citywide"
+
+    def _extract_scenario(self, prompt_lower: str) -> Dict[str, Any]:
+        scenario = {
+            "sector": "transport",
+            "direction": "decrease",
+            "targets": []
+        }
+
+        # Special case: sustainable/renewable/clean technologies are REDUCTIONS even with "add"
+        sustainability_indicators = [
+            "sustainable", "saf", "renewable", "clean", "green", "electric", "ev",
+            "solar", "wind", "hydro", "geothermal", "biofuel", "hydrogen",
+            "efficiency", "insulation", "led", "heat pump"
+        ]
+        has_sustainability = any(ind in prompt_lower for ind in sustainability_indicators)
+        
+        direction_keywords = {
+            "decrease": ["reduce", "cut", "lower", "decrease", "phase out", "remove", "ban"],
+            "increase": ["increase", "boost", "expand", "grow", "invest"]  # Removed "add" - context-dependent
+        }
+
+        # Check for explicit direction keywords
+        for direction, keywords in direction_keywords.items():
+            if any(keyword in prompt_lower for keyword in keywords):
+                scenario["direction"] = direction
+                break
+        
+        # Special handling for "add" - depends on context
+        if "add" in prompt_lower:
+            if has_sustainability:
+                scenario["direction"] = "decrease"  # Adding clean tech reduces emissions
+            else:
+                scenario["direction"] = "increase"  # Adding non-clean items increases emissions
+        
+        # "plant" is always a decrease (trees, vegetation)
+        if "plant" in prompt_lower:
+            scenario["direction"] = "decrease"
+
+        transport_targets = {
+            "taxi": "taxis",
+            "cab": "taxis",
+            "bus": "buses",
+            "buses": "buses",
+            "subway": "rail",
+            "train": "rail",
+            "car": "cars",
+            "cars": "cars",
+            "vehicle": "vehicles",
+            "airline": "aviation",
+            "plane": "aviation",
+            "flight": "aviation",
+            "airport": "aviation"
+        }
+
+        building_targets = {
+            "building": "buildings",
+            "skyscraper": "buildings",
+            "office": "commercial",
+            "residential": "residential",
+            "solar": "solar",
+            "panel": "solar",
+            "heat pump": "heat_pumps",
+            "hvac": "hvac"
+        }
+
+        industry_targets = {
+            "factory": "factories",
+            "industrial": "industrial",
+            "manufacturing": "factories",
+            "warehouse": "warehouses",
+            "port": "port"
+        }
+
+        energy_targets = {
+            "grid": "grid",
+            "power": "power",
+            "electricity": "power",
+            "battery": "storage",
+            "storage": "storage"
+        }
+
+        nature_targets = {
+            "tree": "trees",
+            "trees": "trees",
+            "park": "parks",
+            "green roof": "green_roofs",
+            "greenroof": "green_roofs",
+            "garden": "gardens"
+        }
+
+        sector_map = {
+            "transport": transport_targets,
+            "buildings": building_targets,
+            "industry": industry_targets,
+            "energy": energy_targets,
+            "nature": nature_targets
+        }
+
+        for sector, keywords in sector_map.items():
+            for keyword, target in keywords.items():
+                if keyword in prompt_lower:
+                    scenario["sector"] = sector
+                    scenario.setdefault("targets", []).append(target)
+        
+        if not scenario.get("targets"):
+            scenario["targets"].append("general")
+
+        if scenario["sector"] == "transport":
+            if "bus" in prompt_lower or "buses" in prompt_lower:
+                scenario["subsector"] = "bus"
+            elif ("air" in prompt_lower or "plane" in prompt_lower or "flight" in prompt_lower or 
+                  "airport" in prompt_lower or "jfk" in prompt_lower or "lga" in prompt_lower or 
+                  "laguardia" in prompt_lower or "aviation" in prompt_lower):
+                scenario["subsector"] = "aviation"
+                # Store specific airport if mentioned
+                if "jfk" in prompt_lower:
+                    scenario["specific_location"] = "JFK Airport"
+                elif "lga" in prompt_lower or "laguardia" in prompt_lower:
+                    scenario["specific_location"] = "LaGuardia Airport"
+            elif "taxi" in prompt_lower or "cab" in prompt_lower:
+                scenario["subsector"] = "taxis"
+            elif "rail" in prompt_lower or "subway" in prompt_lower or "train" in prompt_lower:
+                scenario["subsector"] = "rail"
+            elif "freight" in prompt_lower or "truck" in prompt_lower:
+                scenario["subsector"] = "freight"
+            else:
+                scenario["subsector"] = "road"
+        elif scenario["sector"] == "buildings":
+            if "commercial" in prompt_lower or "office" in prompt_lower:
+                scenario["subsector"] = "commercial"
+            elif "residential" in prompt_lower or "apartment" in prompt_lower:
+                scenario["subsector"] = "residential"
+            else:
+                scenario["subsector"] = "mixed"
+        elif scenario["sector"] == "industry":
+            if "port" in prompt_lower or "shipping" in prompt_lower:
+                scenario["subsector"] = "port"
+            elif "warehouse" in prompt_lower:
+                scenario["subsector"] = "logistics"
+            else:
+                scenario["subsector"] = "general"
+        elif scenario["sector"] == "nature":
+            if "tree" in prompt_lower or "forest" in prompt_lower:
+                scenario["subsector"] = "urban_forest"
+            elif "park" in prompt_lower:
+                scenario["subsector"] = "parks"
+            else:
+                scenario["subsector"] = "green_infrastructure"
+        else:
+            scenario["subsector"] = "general"
+
+        return scenario
+
+    def _extract_percentage(self, prompt_lower: str, scenario: Dict[str, Any]) -> float:
+        percent = 20.0
+        explicit = re.search(r'(\d+\.?\d*)\s*%', prompt_lower)
+        if explicit:
+            percent = float(explicit.group(1))
+        else:
+            if 'all' in prompt_lower or '100%' in prompt_lower:
+                percent = 100.0
+            elif 'half' in prompt_lower or '50%' in prompt_lower:
+                percent = 50.0
+            elif 'quarter' in prompt_lower or '25%' in prompt_lower:
+                percent = 25.0
+            elif 'double' in prompt_lower and scenario.get("direction") == "increase":
+                percent = 100.0
+            elif 'double' in prompt_lower:
+                percent = 30.0
+            elif 'increase' in prompt_lower and scenario.get("direction") == "increase":
+                percent = 20.0
+
+        return float(max(0, min(percent, 100)))

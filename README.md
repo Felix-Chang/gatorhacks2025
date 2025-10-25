@@ -1,6 +1,8 @@
-# NYC CO₂ Sustainability Simulation
+# CO₂UNT
 
-An AI-powered climate action visualization tool for New York City that simulates the environmental impact of sustainability interventions.
+**An AI-powered climate impact simulator for New York City**
+
+CO₂UNT (pronounced "count") uses artificial intelligence and real NYC data to simulate the environmental impact of sustainability interventions across all five boroughs.
 
 ## 🌍 Overview
 
@@ -153,6 +155,8 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 
 ---
 
-**Built with ❤️ for NYC's sustainable future**
-=======
-# gatorhacks2025
+---
+
+**CO₂UNT** - Making climate impact visible, measurable, and actionable.
+
+Built for GatorHacks 2025 🐊

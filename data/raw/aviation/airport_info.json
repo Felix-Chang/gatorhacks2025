@@ -1,0 +1,45 @@
+{
+  "airport_codes": {
+    "JFK": {
+      "name": "John F. Kennedy International Airport",
+      "iata": "JFK",
+      "icao": "KJFK",
+      "lat": 40.6413,
+      "lon": -73.7781,
+      "elevation": 13
+    },
+    "LGA": {
+      "name": "LaGuardia Airport",
+      "iata": "LGA",
+      "icao": "KLGA",
+      "lat": 40.7769,
+      "lon": -73.874,
+      "elevation": 22
+    },
+    "EWR": {
+      "name": "Newark Liberty International Airport",
+      "iata": "EWR",
+      "icao": "KEWR",
+      "lat": 40.6895,
+      "lon": -74.1745,
+      "elevation": 18
+    }
+  },
+  "typical_operations": {
+    "JFK": {
+      "daily_flights": 1200,
+      "annual_passengers": 62000000,
+      "cargo_tons": 1400000
+    },
+    "LGA": {
+      "daily_flights": 1000,
+      "annual_passengers": 31000000,
+      "cargo_tons": 50000
+    },
+    "EWR": {
+      "daily_flights": 1100,
+      "annual_passengers": 46000000,
+      "cargo_tons": 900000
+    }
+  }
+}
