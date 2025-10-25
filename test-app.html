@@ -1,0 +1,448 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NYC CO₂ Sustainability Simulation</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+        }
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 20px;
+        }
+        .input-box {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background: #45a049;
+        }
+        .button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .result {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            background: #ffe6e6;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border-left: 4px solid #ff4444;
+        }
+        .examples {
+            background: #f0f8ff;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .examples h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .examples ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .examples li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .map-container {
+            margin: 20px 0;
+            height: 400px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        .map-controls {
+            margin: 10px 0;
+            text-align: center;
+        }
+        .map-button {
+            background: #2196F3;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+            font-size: 14px;
+        }
+        .map-button:hover {
+            background: #1976D2;
+        }
+        .map-button.active {
+            background: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🌍 NYC CO₂ Sustainability Simulation</h1>
+        <p>AI-powered climate action visualization for New York City</p>
+    </div>
+    
+    <div class="content">
+        <h2>Try a Sustainability Action</h2>
+        <div class="input-group">
+            <input 
+                type="text" 
+                class="input-box" 
+                id="promptInput"
+                placeholder="e.g., Convert 30% of taxis to EVs in Manhattan"
+            />
+            <button class="button" onclick="simulate()" id="simulateBtn">
+                🚀 Simulate Impact
+            </button>
+        </div>
+
+        <div id="status"></div>
+        <div id="result"></div>
+        <div id="error"></div>
+
+        <div class="map-container">
+            <div class="map-controls">
+                <button class="map-button active" onclick="showBaseline()">📊 Baseline Emissions</button>
+                <button class="map-button" onclick="showSimulation()">🎯 Simulation Results</button>
+                <button class="map-button" onclick="showDifference()">📈 Impact Difference</button>
+                <button class="map-button" onclick="clearMap()">🗑️ Clear Map</button>
+            </div>
+            <div id="map"></div>
+        </div>
+
+        <div class="examples">
+            <h3>Example Prompts:</h3>
+            <ul>
+                <li>Convert 30% of taxis to EVs in Manhattan</li>
+                <li>Add solar panels to 50% of Brooklyn buildings</li>
+                <li>Reduce citywide industrial emissions by 20%</li>
+                <li>Install green roofs on 25% of Queens buildings</li>
+                <li>Convert Staten Island buses to electric</li>
+            </ul>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let baseline = null;
+        let simulation = null;
+        let map = null;
+        let currentLayer = null;
+        
+        // Load baseline data on page load
+        window.onload = function() {
+            loadBaseline();
+            initMap();
+        };
+        
+        function initMap() {
+            // Initialize map centered on NYC
+            map = L.map('map').setView([40.7128, -74.0060], 10);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+            
+            // Add NYC bounds
+            const nycBounds = L.latLngBounds(
+                [40.49, -74.26], // Southwest corner
+                [40.92, -73.70]  // Northeast corner
+            );
+            map.setMaxBounds(nycBounds);
+        }
+        
+        function createHeatmapLayer(data, title, color) {
+            const markers = [];
+            
+            // Calculate dynamic range for better visualization
+            const values = data.map(point => point.value);
+            const minValue = Math.min(...values);
+            const maxValue = Math.max(...values);
+            const range = maxValue - minValue;
+            
+            console.log(`${title} - Min: ${minValue.toFixed(2)}, Max: ${maxValue.toFixed(2)}, Range: ${range.toFixed(2)}`);
+            
+            data.forEach(point => {
+                // Normalize based on actual data range for this dataset
+                const normalizedIntensity = range > 0 ? (point.value - minValue) / range : 0.5;
+                const opacity = 0.4 + (normalizedIntensity * 0.6); // Opacity based on relative intensity
+                
+                const marker = L.circleMarker([point.lat, point.lon], {
+                    radius: 2 + (normalizedIntensity * 8), // Size based on relative intensity
+                    fillColor: color,
+                    color: color,
+                    weight: 1,
+                    opacity: opacity,
+                    fillOpacity: opacity
+                });
+                
+                marker.bindPopup(`
+                    <strong>${title}</strong><br>
+                    Location: ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}<br>
+                    Emissions: ${point.value.toFixed(2)} kg CO₂/km²/day<br>
+                    Relative Intensity: ${(normalizedIntensity * 100).toFixed(1)}%
+                `);
+                
+                markers.push(marker);
+            });
+            
+            return L.layerGroup(markers);
+        }
+        
+        function showBaseline() {
+            if (!baseline) {
+                updateError('Baseline data not loaded yet');
+                return;
+            }
+            
+            clearMap();
+            currentLayer = createHeatmapLayer(baseline.grid, 'Baseline Emissions', '#ff4444');
+            currentLayer.addTo(map);
+            
+            // Update button states
+            document.querySelectorAll('.map-button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            updateStatus('📊 Showing baseline NYC emissions data');
+        }
+        
+        function showDifference() {
+            if (!baseline || !simulation) {
+                updateError('Need both baseline and simulation data to show difference.');
+                return;
+            }
+            
+            clearMap();
+            
+            // Calculate difference between baseline and simulation
+            const differenceData = baseline.grid.map((baselinePoint, index) => {
+                const simPoint = simulation.grid[index];
+                const reduction = baselinePoint.value - simPoint.value;
+                const reductionPercent = (reduction / baselinePoint.value) * 100;
+                
+                return {
+                    lat: baselinePoint.lat,
+                    lon: baselinePoint.lon,
+                    value: reductionPercent, // Show reduction percentage
+                    baselineValue: baselinePoint.value,
+                    simulationValue: simPoint.value
+                };
+            });
+            
+            currentLayer = createDifferenceLayer(differenceData, 'Impact Difference');
+            currentLayer.addTo(map);
+            
+            // Update button states
+            document.querySelectorAll('.map-button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            updateStatus('📈 Showing impact difference (reduction percentage)');
+        }
+        
+        function createDifferenceLayer(data, title) {
+            const markers = [];
+            
+            // Calculate range for difference visualization
+            const values = data.map(point => point.value);
+            const minValue = Math.min(...values);
+            const maxValue = Math.max(...values);
+            const range = maxValue - minValue;
+            
+            console.log(`${title} - Min: ${minValue.toFixed(2)}%, Max: ${maxValue.toFixed(2)}%, Range: ${range.toFixed(2)}%`);
+            
+            data.forEach(point => {
+                // Normalize difference for visualization
+                const normalizedDifference = range > 0 ? (point.value - minValue) / range : 0.5;
+                
+                // Color based on reduction amount (green = more reduction)
+                let color = '#ff4444'; // Red for no reduction
+                if (point.value > 5) color = '#ffaa44'; // Orange for small reduction
+                if (point.value > 15) color = '#44ff44'; // Green for good reduction
+                if (point.value > 30) color = '#00aa00'; // Dark green for great reduction
+                
+                const opacity = 0.5 + (normalizedDifference * 0.5);
+                
+                const marker = L.circleMarker([point.lat, point.lon], {
+                    radius: 3 + (normalizedDifference * 6),
+                    fillColor: color,
+                    color: color,
+                    weight: 1,
+                    opacity: opacity,
+                    fillOpacity: opacity
+                });
+                
+                marker.bindPopup(`
+                    <strong>${title}</strong><br>
+                    Location: ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}<br>
+                    Reduction: ${point.value.toFixed(1)}%<br>
+                    Before: ${point.baselineValue.toFixed(2)} kg CO₂/km²/day<br>
+                    After: ${point.simulationValue.toFixed(2)} kg CO₂/km²/day
+                `);
+                
+                markers.push(marker);
+            });
+            
+            return L.layerGroup(markers);
+        }
+        
+        function showSimulation() {
+            if (!simulation) {
+                updateError('No simulation data available. Run a simulation first.');
+                return;
+            }
+            
+            clearMap();
+            currentLayer = createHeatmapLayer(simulation.grid, 'Simulation Results', '#44ff44');
+            currentLayer.addTo(map);
+            
+            // Update button states
+            document.querySelectorAll('.map-button').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            updateStatus('🎯 Showing simulation results');
+        }
+        
+        function clearMap() {
+            if (currentLayer) {
+                map.removeLayer(currentLayer);
+                currentLayer = null;
+            }
+            
+            // Update button states
+            document.querySelectorAll('.map-button').forEach(btn => btn.classList.remove('active'));
+        }
+        
+        async function loadBaseline() {
+            try {
+                const response = await fetch('http://localhost:8000/api/baseline');
+                if (!response.ok) throw new Error('Failed to load baseline data');
+                
+                baseline = await response.json();
+                updateStatus(`✅ Baseline Loaded: ${baseline.grid.length} emission data points for NYC`);
+            } catch (error) {
+                updateError(`Failed to load baseline data: ${error.message}`);
+            }
+        }
+        
+        async function simulate() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            if (!prompt) return;
+            
+            const btn = document.getElementById('simulateBtn');
+            btn.disabled = true;
+            btn.textContent = 'Simulating...';
+            
+            clearMessages();
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/simulate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt: prompt })
+                });
+                
+                if (!response.ok) throw new Error('Simulation failed');
+                
+                const data = await response.json();
+                simulation = data; // Store simulation data
+                displayResult(data);
+                
+                // Automatically show simulation results on map
+                setTimeout(() => {
+                    showSimulation();
+                }, 500);
+                
+            } catch (error) {
+                updateError(`Simulation failed: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🚀 Simulate Impact';
+            }
+        }
+        
+        function displayResult(data) {
+            const intervention = data.intervention;
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.innerHTML = `
+                <div class="result">
+                    <h3>Simulation Result:</h3>
+                    <p><strong>Location:</strong> ${intervention.borough}</p>
+                    <p><strong>Sector:</strong> ${intervention.sector}</p>
+                    <p><strong>Reduction:</strong> ${intervention.reduction_percent}% emissions</p>
+                    <p><strong>Description:</strong> ${intervention.description}</p>
+                    <p><strong>Grid Points:</strong> ${data.grid.length} data points updated</p>
+                </div>
+            `;
+        }
+        
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = `<div class="result">${message}</div>`;
+        }
+        
+        function updateError(message) {
+            document.getElementById('error').innerHTML = `<div class="error"><strong>Error:</strong> ${message}</div>`;
+        }
+        
+        function clearMessages() {
+            document.getElementById('status').innerHTML = '';
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('error').innerHTML = '';
+        }
+        
+        // Allow Enter key to trigger simulation
+        document.getElementById('promptInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                simulate();
+            }
+        });
+    </script>
+</body>
+</html>
