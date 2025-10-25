@@ -814,22 +814,26 @@ body::after {
 }
 
 /* Grid Stats */
+.stat-card:not(.featured-stat) {
+    grid-column: 1 / -1;
+}
+
 .stat-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 1rem;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1.5rem;
 }
 
 .stat-item {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding: 1rem;
+    padding: 1.25rem 1rem;
     background: rgba(17, 24, 39, 0.6);
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     text-align: center;
-    min-height: 80px;
+    min-height: 90px;
     justify-content: center;
 }
 
