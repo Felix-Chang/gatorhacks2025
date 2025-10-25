@@ -54,6 +54,7 @@ const MAX_MARKERS_TO_RENDER = 800
 
 const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, unitSystem }) {
   const [zoomLevel, setZoomLevel] = useState(11)
+  const [mapCenter, setMapCenter] = useState([40.7128, -74.006])
   
   const points = useMemo(() => {
     if (!data || data.length === 0) return []
@@ -87,14 +88,16 @@ const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, un
 
   return (
     <MapContainer 
-      center={[40.7128, -74.006]} 
-      zoom={11} 
+      center={mapCenter} 
+      zoom={zoomLevel} 
       className="map" 
-      key={view}
       whenReady={(map) => {
-        // Track zoom changes
+        // Track zoom and center changes
         map.target.on('zoomend', () => {
           setZoomLevel(map.target.getZoom())
+        })
+        map.target.on('moveend', () => {
+          setMapCenter(map.target.getCenter())
         })
       }}
     >
