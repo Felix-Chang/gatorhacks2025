@@ -56,9 +56,7 @@ const Logo = ({ size = 'medium', animated = false }) => {
         </svg>
       </div>
       <div className="logo-text">
-        <span className="logo-co">CO</span>
-        <span className="logo-subscript">2</span>
-        <span className="logo-unt">UNT</span>
+        <span className="logo-co">CarbonIQ</span>
       </div>
     </div>
   )

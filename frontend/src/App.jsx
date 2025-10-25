@@ -220,7 +220,7 @@ function IntroScreen({ onStart, isFadingOut }) {
   const [showButton, setShowButton] = useState(false)
   const [cursorVisible, setCursorVisible] = useState(true)
   
-  const title = 'CO₂UNT'
+  const title = 'CarbonIQ'
   const subtitle = 'AI-Powered Climate Impact Simulator for NYC'
   
   useEffect(() => {
@@ -358,12 +358,12 @@ function App() {
   
   // Draggable sidebar state
   const [sidebarPosition, setSidebarPosition] = useState(() => {
-    const saved = localStorage.getItem('co2unt_sidebar_position_expanded')
+    const saved = localStorage.getItem('carboniq_sidebar_position_expanded')
     if (saved) {
       const parsed = JSON.parse(saved)
       // Clean up old centered position format (has transform property)
       if (parsed.transform) {
-        localStorage.removeItem('co2unt_sidebar_position_expanded')
+        localStorage.removeItem('carboniq_sidebar_position_expanded')
         return { bottom: '2rem', left: '2rem' }
       }
       return parsed
@@ -377,7 +377,7 @@ function App() {
 
   useEffect(() => {
     // Check if user has seen intro before
-    const hasSeenIntro = localStorage.getItem('co2unt_seen_intro')
+    const hasSeenIntro = localStorage.getItem('carboniq_seen_intro')
     if (hasSeenIntro) {
       setShowIntro(false)
       loadBaseline()
@@ -386,7 +386,7 @@ function App() {
 
   const handleStartApp = () => {
     setIntroFadingOut(true)
-    localStorage.setItem('co2unt_seen_intro', 'true')
+    localStorage.setItem('carboniq_seen_intro', 'true')
     
     // Wait for fade out animation, then hide intro and load baseline
     setTimeout(() => {
@@ -438,7 +438,7 @@ function App() {
       if (isDragging) {
         setIsDragging(false)
         // Save position
-        localStorage.setItem('co2unt_sidebar_position_expanded', JSON.stringify(sidebarPosition))
+        localStorage.setItem('carboniq_sidebar_position_expanded', JSON.stringify(sidebarPosition))
       }
     }
     
@@ -457,7 +457,7 @@ function App() {
     const handleEscKey = (e) => {
       if (e.key === 'Escape' && isHistoryExpanded) {
         // Save position before minimizing
-        localStorage.setItem('co2unt_sidebar_position_expanded', JSON.stringify(sidebarPosition))
+        localStorage.setItem('carboniq_sidebar_position_expanded', JSON.stringify(sidebarPosition))
         setIsHistoryExpanded(false)
       }
     }
@@ -470,7 +470,7 @@ function App() {
   const toggleHistoryExpansion = () => {
     if (isHistoryExpanded) {
       // Save position before minimizing
-      localStorage.setItem('co2unt_sidebar_position_expanded', JSON.stringify(sidebarPosition))
+      localStorage.setItem('carboniq_sidebar_position_expanded', JSON.stringify(sidebarPosition))
     }
     setIsHistoryExpanded(!isHistoryExpanded)
   }
@@ -506,7 +506,7 @@ function App() {
       setCurrentView('simulation')
       
       // Debug: Log statistics to console
-      console.log('[CO2UNT] Statistics received:', {
+      console.log('[CARBONIQ] Statistics received:', {
         is_increase: statisticsData?.is_increase,
         is_unrelated: statisticsData?.is_unrelated,
         direction: statisticsData?.direction,
@@ -516,7 +516,7 @@ function App() {
       
       // Ensure statistics has required fields
       if (!statisticsData) {
-        console.warn('[CO2UNT] No statistics data received from backend')
+        console.warn('[CARBONIQ] No statistics data received from backend')
       }
       
       // Add to conversation history
@@ -559,7 +559,7 @@ function App() {
       setStatistics(null)
       setCurrentView('baseline')
       // Reset position to bottom-left corner and minimize
-      localStorage.removeItem('co2unt_sidebar_position_expanded')
+      localStorage.removeItem('carboniq_sidebar_position_expanded')
       setSidebarPosition({ bottom: '2rem', left: '2rem' })
       setIsHistoryExpanded(false) // Minimize the card
     }
@@ -573,7 +573,7 @@ function App() {
 
     // If this was the last conversation, reset position and minimize
     if (newHistory.length === 0) {
-      localStorage.removeItem('co2unt_sidebar_position_expanded')
+      localStorage.removeItem('carboniq_sidebar_position_expanded')
       setSidebarPosition({ bottom: '2rem', left: '2rem' })
       setIsHistoryExpanded(false) // Minimize the card
     }
@@ -791,7 +791,7 @@ function App() {
           <div className="header-left">
             <Logo size="small" />
             <div className="header-text">
-              <h1 className="title">CO₂UNT</h1>
+              <h1 className="title">CarbonIQ</h1>
               <p className="subtitle">AI-Powered Climate Impact Simulator for NYC</p>
             </div>
           </div>
