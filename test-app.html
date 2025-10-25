@@ -3,9 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NYC CO₂ Emissions Simulator</title>
+    <title>NYC CO₂ Emissions Simulator - Advanced Analytics</title>
+    
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Chart.js for advanced visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <style>
         * {
             margin: 0;
@@ -15,414 +26,597 @@
 
         body {
             font-family: 'Inter', sans-serif;
-            background: #ffffff;
+            background: #2d5016; /* fallback while image loads */
             min-height: 100vh;
-            color: #1a1a1a;
-            line-height: 1.6;
+            color: #2d5016;
+            position: relative;
+        }
+
+        /* Page-wide Earth background with low saturation and brightness */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?q=80&w=1920&auto=format&fit=crop') center/cover no-repeat;
+            filter: saturate(30%) brightness(55%) contrast(100%);
+            opacity: 0.75; /* make the earth image clearly visible */
+            pointer-events: none;
+        }
+
+        /* Subtle green tint to keep the earth theme consistent */
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            background: radial-gradient(ellipse at 50% 20%, rgba(74,124,89,0.08), rgba(45,80,22,0.12) 60%, rgba(0,0,0,0.25) 100%);
+            pointer-events: none;
         }
 
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 24px;
+            padding: 20px;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 40px;
-            padding: 40px 0;
-            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 30px;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"><defs><radialGradient id="earthGrad" cx="50%" cy="30%" r="70%"><stop offset="0%" style="stop-color:%23FFD700;stop-opacity:0.3"/><stop offset="50%" style="stop-color:%23006699;stop-opacity:0.4"/><stop offset="100%" style="stop-color:%23003366;stop-opacity:0.6"/></radialGradient></defs><rect width="100%" height="100%" fill="url(%23earthGrad)"/><circle cx="50%" cy="30%" r="25%" fill="%23006699" opacity="0.3"/><circle cx="30%" cy="60%" r="15%" fill="%23003366" opacity="0.2"/><circle cx="70%" cy="70%" r="20%" fill="%23006699" opacity="0.25"/></svg>') center/cover;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(5px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(2px);
+            z-index: 1;
+        }
+
+        .header > * {
+            position: relative;
+            z-index: 2;
         }
 
         .header h1 {
-            font-size: 2.8rem;
+            font-size: 2.5rem;
             font-weight: 700;
-            margin-bottom: 12px;
-            color: #111827;
-            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, #ffffff, #e8f5e8, #d4edda);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .header p {
-            font-size: 1.2rem;
-            color: #6b7280;
-            font-weight: 400;
+            font-size: 1.1rem;
+            color: #ffffff;
+            margin-bottom: 20px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
         }
 
-        .main-grid {
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        .status-success {
+            background: rgba(107, 142, 35, 0.3);
+            color: #90EE90;
+            border: 1px solid rgba(107, 142, 35, 0.5);
+        }
+
+        .status-error {
+            background: rgba(255, 99, 71, 0.3);
+            color: #FFB6C1;
+            border: 1px solid rgba(255, 99, 71, 0.5);
+        }
+
+        .status-loading {
+            background: rgba(74, 124, 89, 0.3);
+            color: #98FB98;
+            border: 1px solid rgba(74, 124, 89, 0.5);
+        }
+
+        .main-content {
             display: grid;
             grid-template-columns: 1fr 2fr;
-            gap: 32px;
-            margin-bottom: 32px;
+            gap: 30px;
+            margin-bottom: 30px;
         }
 
-        .card {
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 32px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            transition: all 0.2s ease;
+        .control-panel {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            height: fit-content;
         }
 
-        .card:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .input-section {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
+        .control-panel h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #2d5016;
         }
 
         .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+            margin-bottom: 25px;
         }
 
-        label {
+        .input-group label {
+            display: block;
             font-weight: 500;
-            color: #374151;
-            font-size: 0.95rem;
+            margin-bottom: 8px;
+            color: #4a7c59;
         }
 
-        .prompt-input {
+        .input-group input,
+        .input-group textarea {
             width: 100%;
-            padding: 16px 20px;
+            padding: 12px 16px;
             border: 2px solid #e5e7eb;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 1rem;
-            font-family: inherit;
-            transition: all 0.2s ease;
-            background: #ffffff;
-            color: #111827;
+            transition: all 0.3s ease;
+            background: white;
         }
 
-        .prompt-input:focus {
+        .input-group input:focus,
+        .input-group textarea:focus {
             outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: #4a7c59;
+            box-shadow: 0 0 0 3px rgba(74, 124, 89, 0.2);
         }
 
-        .prompt-input::placeholder {
-            color: #9ca3af;
+        .input-group textarea {
+            resize: vertical;
+            min-height: 100px;
         }
 
-        .simulate-btn {
-            background: #111827;
-            color: white;
+        .btn {
+            padding: 12px 24px;
             border: none;
-            padding: 16px 32px;
-            border-radius: 8px;
+            border-radius: 12px;
             font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
-            font-family: inherit;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
 
-        .simulate-btn:hover {
-            background: #1f2937;
-            transform: translateY(-1px);
+        .btn-primary {
+            background: linear-gradient(135deg, #2d5016, #4a7c59, #6b8e23);
+            color: white;
+            box-shadow: 0 4px 15px rgba(45, 80, 22, 0.3);
         }
 
-        .simulate-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(45, 80, 22, 0.4);
         }
 
-        .examples {
-            margin-top: 24px;
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.9);
+            color: #2d5016;
+            border: 2px solid #4a7c59;
         }
 
-        .examples h3 {
-            font-size: 0.9rem;
-            color: #6b7280;
-            margin-bottom: 12px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+        .btn-secondary:hover {
+            background: #4a7c59;
+            color: white;
         }
 
-        .example-btn {
-            background: #f9fafb;
-            color: #374151;
-            border: 1px solid #e5e7eb;
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 0.85rem;
+        .example-prompts {
+            margin-top: 20px;
+        }
+
+        .example-prompts h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #4a7c59;
+        }
+
+        .prompt-example {
+            padding: 12px 16px;
+            background: rgba(74, 124, 89, 0.1);
+            border: 1px solid rgba(74, 124, 89, 0.2);
+            border-radius: 10px;
+            margin-bottom: 10px;
             cursor: pointer;
-            margin: 4px 8px 4px 0;
-            transition: all 0.2s ease;
-            font-family: inherit;
-            font-weight: 500;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
         }
 
-        .example-btn:hover {
-            background: #f3f4f6;
-            border-color: #d1d5db;
+        .prompt-example:hover {
+            background: rgba(74, 124, 89, 0.2);
+            transform: translateX(5px);
         }
 
         .map-container {
-            position: relative;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
         }
 
-        #map {
-            height: 500px;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid #e5e7eb;
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .map-header h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2d5016;
         }
 
         .map-controls {
             display: flex;
-            gap: 8px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
+            gap: 10px;
         }
 
         .map-btn {
-            background: #ffffff;
-            color: #374151;
-            border: 1px solid #d1d5db;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 0.9rem;
+            padding: 8px 16px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            border-radius: 10px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            font-family: inherit;
+            transition: all 0.3s ease;
             font-weight: 500;
-        }
-
-        .map-btn:hover {
-            background: #f9fafb;
-            border-color: #9ca3af;
+            font-size: 0.9rem;
         }
 
         .map-btn.active {
-            background: #111827;
+            background: #4a7c59;
             color: white;
-            border-color: #111827;
+            border-color: #4a7c59;
+        }
+
+        .map-btn:hover {
+            border-color: #4a7c59;
+            color: #4a7c59;
+        }
+
+        .map-btn.active:hover {
+            color: white;
+        }
+
+        #map {
+            height: 500px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         }
 
         .legend {
             margin-top: 20px;
             padding: 20px;
-            background: #f9fafb;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            border: 1px solid #e5e7eb;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 15px;
         }
 
-        .legend h4 {
-            margin-bottom: 12px;
-            color: #374151;
+        .legend h3 {
+            font-size: 1.1rem;
             font-weight: 600;
+            margin-bottom: 15px;
+            color: #2d5016;
         }
 
         .legend-item {
             display: flex;
             align-items: center;
-            margin-bottom: 6px;
+            gap: 10px;
+            margin-bottom: 10px;
         }
 
         .legend-color {
-            width: 16px;
-            height: 16px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
-            margin-right: 12px;
-            border: 1px solid rgba(0,0,0,0.1);
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 20px;
-            margin-top: 20px;
+            margin-top: 30px;
         }
 
-        .stat-card {
-            background: #ffffff;
-            padding: 24px;
-            border-radius: 8px;
-            text-align: center;
-            border: 1px solid #e5e7eb;
-            transition: all 0.2s ease;
+        .stats-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
         }
 
-        .stat-card:hover {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        .stats-card h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #2d5016;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .stat-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #111827;
-            margin-bottom: 8px;
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .stat-item:last-child {
+            border-bottom: none;
         }
 
         .stat-label {
-            font-size: 0.85rem;
-            color: #6b7280;
             font-weight: 500;
+            color: #4a7c59;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            color: #2d5016;
+            text-align: right;
         }
 
         .ai-analysis {
-            margin-top: 32px;
-            padding: 24px;
-            background: #ffffff;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            border-left: 4px solid #3b82f6;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin-top: 30px;
         }
 
         .ai-analysis h3 {
-            color: #111827;
-            margin-bottom: 16px;
+            font-size: 1.2rem;
             font-weight: 600;
+            margin-bottom: 15px;
+            color: #2d5016;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .ai-content {
-            color: #4b5563;
-            line-height: 1.7;
+            background: rgba(74, 124, 89, 0.1);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 4px solid #4a7c59;
             font-size: 0.95rem;
+            line-height: 1.6;
+            color: #4a7c59;
         }
 
-        .status {
-            padding: 16px 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-weight: 500;
-            display: none;
-            border: 1px solid;
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
         }
 
-        .status.success {
-            background: #f0fdf4;
-            color: #166534;
-            border-color: #bbf7d0;
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
-        .status.error {
-            background: #fef2f2;
-            color: #dc2626;
-            border-color: #fecaca;
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
         }
 
-        .status.info {
-            background: #eff6ff;
-            color: #2563eb;
-            border-color: #bfdbfe;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: #111827;
-            margin-bottom: 16px;
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 768px) {
-            .main-grid {
-                grid-template-columns: 1fr;
+            .container {
+                padding: 10px;
             }
             
             .header h1 {
-                font-size: 2.2rem;
+                font-size: 2rem;
             }
             
-            #map {
-                height: 400px;
+            .map-controls {
+                flex-wrap: wrap;
             }
             
-            .container {
-                padding: 16px;
+            .stats-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <header class="header">
-            <h1>NYC CO₂ Emissions Simulator</h1>
-            <p>Simulate the impact of environmental interventions across New York City</p>
-        </header>
+        <!-- Header -->
+        <div class="header">
+            <h1>🌍 NYC CO₂ Emissions Simulator 🌱</h1>
+            <p>🌿 Advanced AI-Powered Environmental Impact Analysis 🌿</p>
+            
+            <div class="status-bar">
+                <div class="status-indicator status-success">
+                    <i class="fas fa-check-circle"></i>
+                    <span>🌐 Backend Connected</span>
+                </div>
+                <div class="status-indicator status-success">
+                    <i class="fas fa-database"></i>
+                    <span>🌍 Real Data Sources</span>
+                </div>
+                <div class="status-indicator status-success">
+                    <i class="fas fa-brain"></i>
+                    <span>🤖 AI Analysis Active</span>
+                </div>
+            </div>
+        </div>
 
-        <div class="main-grid">
-            <div class="card input-section">
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <h2>🌿 Simulation Controls 🌿</h2>
+                
                 <div class="input-group">
-                    <label for="prompt">Enter your environmental intervention:</label>
-                    <input type="text" id="prompt" class="prompt-input" placeholder="e.g., Convert 30% of taxis to EVs in Manhattan">
+                    <label for="promptInput">🌱 Environmental Intervention Prompt 🌱</label>
+                    <textarea id="promptInput" placeholder="Describe your environmental intervention..."></textarea>
                 </div>
                 
-                <button id="simulateBtn" class="simulate-btn" onclick="simulate()">
-                    Simulate Impact
+                <button class="btn btn-primary" onclick="runSimulation()">
+                    <i class="fas fa-play"></i>
+                    🚀 Run Simulation
                 </button>
-
-                <div class="examples">
-                    <h3>Try these examples:</h3>
-                    <button class="example-btn" onclick="setPrompt('Convert 30% of taxis to EVs in Manhattan')">Manhattan EVs</button>
-                    <button class="example-btn" onclick="setPrompt('Add solar panels to 50% of Brooklyn buildings')">Brooklyn Solar</button>
-                    <button class="example-btn" onclick="setPrompt('Convert Staten Island buses to electric')">Staten Island Buses</button>
-                    <button class="example-btn" onclick="setPrompt('Install green roofs on 25% of Queens buildings')">Queens Green Roofs</button>
-                    <button class="example-btn" onclick="setPrompt('Reduce citywide industrial emissions by 20%')">Citywide Industry</button>
+                
+                <button class="btn btn-secondary" onclick="loadBaseline()">
+                    <i class="fas fa-chart-line"></i>
+                    📊 Load Baseline
+                </button>
+                
+                <div class="example-prompts">
+                    <h3>💡 Example Prompts 💡</h3>
+                    <div class="prompt-example" onclick="setPrompt('Convert 30% of Manhattan taxis to electric vehicles')">
+                        🚗 Convert 30% of Manhattan taxis to electric vehicles
+                    </div>
+                    <div class="prompt-example" onclick="setPrompt('Install solar panels on 50% of Brooklyn buildings')">
+                        ☀️ Install solar panels on 50% of Brooklyn buildings
+                    </div>
+                    <div class="prompt-example" onclick="setPrompt('Reduce industrial emissions by 25% in Queens')">
+                        🏭 Reduce industrial emissions by 25% in Queens
+                    </div>
+                    <div class="prompt-example" onclick="setPrompt('Implement green roofs on 40% of Bronx buildings')">
+                        🌿 Implement green roofs on 40% of Bronx buildings
+                    </div>
+                    <div class="prompt-example" onclick="setPrompt('Convert Staten Island buses to electric')">
+                        🚌 Convert Staten Island buses to electric
+                    </div>
                 </div>
             </div>
 
-            <div class="card map-container">
-                <div class="map-controls">
-                    <button class="map-btn" onclick="showBaseline()">Baseline</button>
-                    <button class="map-btn" onclick="showSimulation()">Simulation</button>
-                    <button class="map-btn" onclick="showDifference()">Impact</button>
-                    <button class="map-btn" onclick="clearMap()">Clear</button>
+            <!-- Map Container -->
+            <div class="map-container">
+                <div class="map-header">
+                    <h2>🗺️ NYC Emissions Map 🌍</h2>
+                    <div class="map-controls">
+                        <button class="map-btn" onclick="showBaseline()">📊 Baseline</button>
+                        <button class="map-btn" onclick="showSimulation()">🎯 Simulation</button>
+                        <button class="map-btn" onclick="showDifference()">📈 Impact</button>
+                        <button class="map-btn" onclick="clearMap()">🧹 Clear</button>
+                    </div>
                 </div>
                 
                 <div id="map"></div>
                 
                 <div class="legend">
-                    <h4>Map Legend</h4>
+                    <h3>ℹ️ Map Legend ℹ️</h3>
                     <div class="legend-item">
-                        <div class="legend-color" style="background: #dc2626;"></div>
-                        <span>High Emissions (>1000 kg CO₂/km²/day)</span>
+                        <div class="legend-color" style="background: #ff4444;"></div>
+                        <span>🔴 High Emissions (>1000 kg CO₂/km²/day)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-color" style="background: #ea580c;"></div>
-                        <span>Medium Emissions (100-1000 kg CO₂/km²/day)</span>
+                        <div class="legend-color" style="background: #ff8844;"></div>
+                        <span>🟠 Medium-High Emissions (500-1000 kg CO₂/km²/day)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-color" style="background: #16a34a;"></div>
-                        <span>Low Emissions (<100 kg CO₂/km²/day)</span>
+                        <div class="legend-color" style="background: #ffaa44;"></div>
+                        <span>🟡 Medium Emissions (200-500 kg CO₂/km²/day)</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-color" style="background: #059669;"></div>
-                        <span>Very Low Emissions (<50 kg CO₂/km²/day)</span>
+                        <div class="legend-color" style="background: #88ff44;"></div>
+                        <span>🟢 Low-Medium Emissions (50-200 kg CO₂/km²/day)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #44ff44;"></div>
+                        <span>🌱 Low Emissions (<50 kg CO₂/km²/day)</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div id="status" class="status"></div>
-
-        <div id="stats-section" class="card" style="display: none;">
-            <h3 class="section-title">Simulation Statistics</h3>
-            <div id="stats-grid" class="stats-grid">
-                <!-- Stats will be populated here -->
-            </div>
+        <!-- Statistics Grid -->
+        <div class="stats-grid" id="statsGrid">
+            <!-- Statistics will be populated here -->
         </div>
 
-        <div id="ai-analysis" class="ai-analysis" style="display: none;">
-            <h3>AI Analysis</h3>
-            <div id="analysis-content" class="ai-content"></div>
+        <!-- AI Analysis -->
+        <div class="ai-analysis" id="aiAnalysis" style="display: none;">
+            <h3>🤖 AI Analysis 🌍</h3>
+            <div class="ai-content" id="aiContent">
+                <!-- AI analysis content will be populated here -->
+            </div>
         </div>
     </div>
 
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <script>
+        // Global variables
         let map;
         let baseline = null;
         let simulation = null;
         let currentLayer = null;
+        let charts = {};
 
         // Initialize map
         function initMap() {
@@ -432,152 +626,134 @@
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
             
-            // Set NYC bounds
-            const nycBounds = L.latLngBounds(
-                [40.49, -74.26],  // Southwest corner
-                [40.92, -73.70]   // Northeast corner
-            );
-            map.setMaxBounds(nycBounds);
+            updateStatus('Map initialized successfully', 'success');
         }
 
-        function setPrompt(text) {
-            document.getElementById('prompt').value = text;
-        }
-
+        // Status updates
         function updateStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
+            const statusBar = document.querySelector('.status-bar');
+            const statusIndicator = statusBar.querySelector('.status-indicator');
             
-            // Auto-hide after 5 seconds
-            setTimeout(() => {
-                status.style.display = 'none';
-            }, 5000);
+            statusIndicator.className = `status-indicator status-${type}`;
+            
+            if (type === 'loading') {
+                statusIndicator.innerHTML = `<div class="loading-spinner"></div><span>${message}</span>`;
+            } else {
+                const icon = type === 'success' ? 'check-circle' : 'exclamation-triangle';
+                statusIndicator.innerHTML = `<i class="fas fa-${icon}"></i><span>${message}</span>`;
+            }
         }
 
-        function createHeatmapLayer(data, title, color) {
-            const markers = [];
-            const values = data.map(point => point.value);
-            const minValue = Math.min(...values);
-            const maxValue = Math.max(...values);
-            const range = maxValue - minValue;
-            
-            data.forEach(point => {
-                const normalizedIntensity = range > 0 ? (point.value - minValue) / range : 0.5;
-                const opacity = 0.4 + (normalizedIntensity * 0.6);
+        // Set prompt from examples
+        function setPrompt(prompt) {
+            document.getElementById('promptInput').value = prompt;
+        }
+
+        // Load baseline data
+        async function loadBaseline() {
+            try {
+                updateStatus('Loading baseline emissions data...', 'loading');
                 
-                const marker = L.circleMarker([point.lat, point.lon], {
-                    radius: 3 + (normalizedIntensity * 10),
-                    fillColor: color,
-                    color: color,
-                    weight: 1,
-                    opacity: opacity,
-                    fillOpacity: opacity
+                const response = await fetch('http://localhost:8000/api/baseline');
+                if (!response.ok) throw new Error('Failed to fetch baseline data');
+                
+                const data = await response.json();
+                baseline = data.grid;
+                
+                showBaseline();
+                updateStats(baseline, 'baseline');
+                updateStatus('Baseline data loaded successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error loading baseline:', error);
+                updateStatus('Failed to load baseline data', 'error');
+            }
+        }
+
+        // Run simulation
+        async function runSimulation() {
+            const prompt = document.getElementById('promptInput').value.trim();
+            if (!prompt) {
+                updateStatus('Please enter a simulation prompt', 'error');
+                return;
+            }
+
+            try {
+                updateStatus('Running AI simulation...', 'loading');
+                
+                const response = await fetch('http://localhost:8000/api/simulate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt: prompt })
                 });
                 
-                marker.bindPopup(`
-                    <div style="font-family: Inter, sans-serif; min-width: 200px;">
-                        <h3 style="margin: 0 0 10px 0; color: #111827;">${title}</h3>
-                        <p style="margin: 5px 0;"><strong>Location:</strong> ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}</p>
-                        <p style="margin: 5px 0;"><strong>Emissions:</strong> ${point.value.toFixed(2)} kg CO₂/km²/day</p>
-                    </div>
-                `);
+                if (!response.ok) throw new Error('Simulation failed');
                 
-                markers.push(marker);
-            });
-            
-            return L.layerGroup(markers);
+                const data = await response.json();
+                simulation = data.grid;
+                
+                showSimulation();
+                updateStats(simulation, 'simulation', baseline);
+                
+                // Show AI analysis if available
+                if (data.ai_analysis) {
+                    showAIAnalysis(data.ai_analysis);
+                }
+                
+                updateStatus('Simulation completed successfully', 'success');
+                
+            } catch (error) {
+                console.error('Error running simulation:', error);
+                updateStatus('Simulation failed: ' + error.message, 'error');
+            }
         }
 
-        function createDifferenceLayer(data, title) {
-            const markers = [];
-            const values = data.map(point => point.value);
-            const minValue = Math.min(...values);
-            const maxValue = Math.max(...values);
-            const range = maxValue - minValue;
-            
-            data.forEach(point => {
-                const normalizedDifference = range > 0 ? (point.value - minValue) / range : 0.5;
-                
-                // Color based on reduction amount (green = more reduction)
-                let color = '#dc2626'; // Red for no reduction
-                if (point.value > 5) color = '#ea580c'; // Orange for small reduction
-                if (point.value > 15) color = '#16a34a'; // Green for good reduction
-                if (point.value > 30) color = '#059669'; // Dark green for great reduction
-                
-                const opacity = 0.5 + (normalizedDifference * 0.5);
-                
-                const marker = L.circleMarker([point.lat, point.lon], {
-                    radius: 4 + (normalizedDifference * 8),
-                    fillColor: color,
-                    color: color,
-                    weight: 2,
-                    opacity: opacity,
-                    fillOpacity: opacity
-                });
-                
-                marker.bindPopup(`
-                    <div style="font-family: Inter, sans-serif; min-width: 200px;">
-                        <h3 style="margin: 0 0 10px 0; color: #111827;">${title}</h3>
-                        <p style="margin: 5px 0;"><strong>Location:</strong> ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}</p>
-                        <p style="margin: 5px 0;"><strong>Reduction:</strong> ${point.value.toFixed(1)}%</p>
-                        <p style="margin: 5px 0;"><strong>Before:</strong> ${point.baselineValue.toFixed(2)} kg CO₂/km²/day</p>
-                        <p style="margin: 5px 0;"><strong>After:</strong> ${point.simulationValue.toFixed(2)} kg CO₂/km²/day</p>
-                    </div>
-                `);
-                
-                markers.push(marker);
-            });
-            
-            return L.layerGroup(markers);
-        }
-
+        // Show baseline data
         function showBaseline() {
             if (!baseline) {
-                updateStatus('No baseline data available. Loading...', 'error');
+                updateStatus('No baseline data available', 'error');
                 return;
             }
             
             clearMap();
-            currentLayer = createHeatmapLayer(baseline.grid, 'Baseline Emissions', '#dc2626');
+            currentLayer = createHeatmapLayer(baseline, 'Baseline Emissions', '#ff4444');
             currentLayer.addTo(map);
             
-            // Update button states
             document.querySelectorAll('.map-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelector('.map-btn[onclick="showBaseline()"]').classList.add('active');
             
-            updateStatus('Showing baseline emissions', 'success');
-            updateStats(baseline, 'baseline');
+            updateStatus('Showing baseline emissions data', 'success');
         }
 
+        // Show simulation data
         function showSimulation() {
             if (!simulation) {
-                updateStatus('No simulation data available. Run a simulation first.', 'error');
+                updateStatus('No simulation data available', 'error');
                 return;
             }
             
             clearMap();
-            currentLayer = createHeatmapLayer(simulation.grid, 'Simulation Results', '#16a34a');
+            currentLayer = createHeatmapLayer(simulation, 'Simulation Results', '#44ff44');
             currentLayer.addTo(map);
             
-            // Update button states
             document.querySelectorAll('.map-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelector('.map-btn[onclick="showSimulation()"]').classList.add('active');
             
             updateStatus('Showing simulation results', 'success');
-            updateStats(simulation, 'simulation');
         }
 
+        // Show difference
         function showDifference() {
             if (!baseline || !simulation) {
-                updateStatus('Need both baseline and simulation data to show difference.', 'error');
+                updateStatus('Need both baseline and simulation data', 'error');
                 return;
             }
             
             clearMap();
-            const differenceData = baseline.grid.map((baselinePoint, index) => {
-                const simPoint = simulation.grid[index];
+            const differenceData = baseline.map((baselinePoint, index) => {
+                const simPoint = simulation[index];
                 const reduction = baselinePoint.value - simPoint.value;
                 const reductionPercent = (reduction / baselinePoint.value) * 100;
                 return {
@@ -592,189 +768,390 @@
             currentLayer = createDifferenceLayer(differenceData, 'Impact Difference');
             currentLayer.addTo(map);
             
-            // Update button states
             document.querySelectorAll('.map-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelector('.map-btn[onclick="showDifference()"]').classList.add('active');
             
             updateStatus('Showing impact difference (reduction percentage)', 'success');
-            updateStats(simulation, 'difference', baseline);
         }
 
+        // Clear map
         function clearMap() {
             if (currentLayer) {
                 map.removeLayer(currentLayer);
                 currentLayer = null;
             }
             
-            // Update button states
             document.querySelectorAll('.map-btn').forEach(btn => btn.classList.remove('active'));
-            
-            // Hide stats
-            document.getElementById('stats-section').style.display = 'none';
+            updateStatus('Map cleared', 'success');
         }
 
+        // Create heatmap layer with proper intensity mapping
+        function createHeatmapLayer(data, title, color) {
+            const markers = [];
+            const values = data.map(point => point.value);
+            const minValue = Math.min(...values);
+            const maxValue = Math.max(...values);
+            const range = maxValue - minValue;
+            
+            data.forEach(point => {
+                const normalizedIntensity = range > 0 ? (point.value - minValue) / range : 0.5;
+                
+                // Create color gradient based on intensity
+                let markerColor;
+                if (normalizedIntensity > 0.8) {
+                    markerColor = '#ff4444'; // High - red
+                } else if (normalizedIntensity > 0.6) {
+                    markerColor = '#ff8844'; // Medium-high - orange-red
+                } else if (normalizedIntensity > 0.4) {
+                    markerColor = '#ffaa44'; // Medium - orange
+                } else if (normalizedIntensity > 0.2) {
+                    markerColor = '#88ff44'; // Low-medium - yellow-green
+                } else {
+                    markerColor = '#44ff44'; // Low - green
+                }
+                
+                const opacity = 0.4 + (normalizedIntensity * 0.6);
+                const radius = 3 + (normalizedIntensity * 12);
+                
+                const marker = L.circleMarker([point.lat, point.lon], {
+                    radius: radius,
+                    fillColor: markerColor,
+                    color: markerColor,
+                    weight: 2,
+                    opacity: opacity,
+                    fillOpacity: opacity
+                });
+                
+                marker.bindPopup(`
+                    <div style="font-family: 'Inter', sans-serif;">
+                        <h4 style="margin: 0 0 10px 0; color: #333;">${title}</h4>
+                        <p style="margin: 5px 0;"><strong>Location:</strong> ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}</p>
+                        <p style="margin: 5px 0;"><strong>Emissions:</strong> ${point.value.toFixed(2)} kg CO₂/km²/day</p>
+                        <p style="margin: 5px 0;"><strong>Intensity:</strong> ${(normalizedIntensity * 100).toFixed(1)}%</p>
+                        <p style="margin: 5px 0;"><strong>Level:</strong> ${normalizedIntensity > 0.8 ? 'High' : normalizedIntensity > 0.6 ? 'Medium-High' : normalizedIntensity > 0.4 ? 'Medium' : normalizedIntensity > 0.2 ? 'Low-Medium' : 'Low'}</p>
+                    </div>
+                `);
+                
+                markers.push(marker);
+            });
+            
+            return L.layerGroup(markers);
+        }
+
+        // Create difference layer
+        function createDifferenceLayer(data, title) {
+            const markers = [];
+            
+            data.forEach(point => {
+                let color, intensity;
+                const reduction = point.value;
+                
+                if (reduction > 50) {
+                    color = '#00ff00'; // High reduction - green
+                    intensity = 0.9;
+                } else if (reduction > 25) {
+                    color = '#88ff00'; // Medium-high reduction
+                    intensity = 0.7;
+                } else if (reduction > 10) {
+                    color = '#ffff00'; // Medium reduction - yellow
+                    intensity = 0.5;
+                } else if (reduction > 0) {
+                    color = '#ff8800'; // Low reduction - orange
+                    intensity = 0.3;
+                } else {
+                    color = '#ff0000'; // No reduction or increase - red
+                    intensity = 0.1;
+                }
+                
+                const radius = 3 + (intensity * 10);
+                
+                const marker = L.circleMarker([point.lat, point.lon], {
+                    radius: radius,
+                    fillColor: color,
+                    color: color,
+                    weight: 2,
+                    opacity: intensity,
+                    fillOpacity: intensity
+                });
+                
+                marker.bindPopup(`
+                    <div style="font-family: 'Inter', sans-serif;">
+                        <h4 style="margin: 0 0 10px 0; color: #333;">${title}</h4>
+                        <p style="margin: 5px 0;"><strong>Location:</strong> ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}</p>
+                        <p style="margin: 5px 0;"><strong>Reduction:</strong> ${reduction.toFixed(1)}%</p>
+                        <p style="margin: 5px 0;"><strong>Before:</strong> ${point.baselineValue.toFixed(2)} kg CO₂/km²/day</p>
+                        <p style="margin: 5px 0;"><strong>After:</strong> ${point.simulationValue.toFixed(2)} kg CO₂/km²/day</p>
+                        <p style="margin: 5px 0;"><strong>Impact:</strong> ${reduction > 50 ? 'High' : reduction > 25 ? 'Medium-High' : reduction > 10 ? 'Medium' : reduction > 0 ? 'Low' : 'None'}</p>
+                    </div>
+                `);
+                
+                markers.push(marker);
+            });
+            
+            return L.layerGroup(markers);
+        }
+
+        // Update comprehensive statistics
         function updateStats(data, type, comparisonData = null) {
-            const statsSection = document.getElementById('stats-section');
-            const statsGrid = document.getElementById('stats-grid');
+            const statsGrid = document.getElementById('statsGrid');
             
             if (!data) return;
             
-            // Show stats section
-            statsSection.style.display = 'block';
-            
-            const values = data.grid.map(point => point.value);
+            const values = data.map(point => point.value);
             const minValue = Math.min(...values);
             const maxValue = Math.max(...values);
             const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
             const totalEmissions = values.reduce((a, b) => a + b, 0);
+            const medianValue = values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+            const stdDev = Math.sqrt(values.reduce((sq, n) => sq + Math.pow(n - avgValue, 2), 0) / values.length);
+            
+            // Calculate percentiles
+            const sortedValues = [...values].sort((a, b) => a - b);
+            const percentile25 = sortedValues[Math.floor(sortedValues.length * 0.25)];
+            const percentile75 = sortedValues[Math.floor(sortedValues.length * 0.75)];
+            const percentile90 = sortedValues[Math.floor(sortedValues.length * 0.90)];
+            const percentile95 = sortedValues[Math.floor(sortedValues.length * 0.95)];
+            
+            // Environmental impact calculations
+            const co2Tons = totalEmissions * 0.001; // Convert kg to tons
+            const equivalentCars = totalEmissions / 4.6; // Average car emissions per day
+            const equivalentTrees = totalEmissions / (22 / 365); // Trees needed per day
+            
+            // Health impact estimates
+            const prematureDeaths = co2Tons * 0.01; // Rough estimate
+            const asthmaCases = co2Tons * 0.1; // Rough estimate
+            
+            // Economic impact
+            const healthCosts = co2Tons * 150; // USD per ton CO2
+            const productivityLoss = healthCosts * 0.3;
             
             let statsHTML = '';
             
-            if (type === 'baseline') {
-                statsHTML = `
-                    <div class="stat-card">
-                        <div class="stat-value">${totalEmissions.toFixed(0)}</div>
-                        <div class="stat-label">Total Emissions (kg CO₂/km²/day)</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${avgValue.toFixed(1)}</div>
-                        <div class="stat-label">Average Emissions</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${maxValue.toFixed(0)}</div>
-                        <div class="stat-label">Peak Emissions</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${minValue.toFixed(0)}</div>
-                        <div class="stat-label">Minimum Emissions</div>
-                    </div>
-                `;
-            } else if (type === 'simulation') {
-                const reduction = comparisonData ? 
-                    ((comparisonData.grid.reduce((sum, point) => sum + point.value, 0) - totalEmissions) / 
-                     comparisonData.grid.reduce((sum, point) => sum + point.value, 0) * 100) : 0;
-                
-                statsHTML = `
-                    <div class="stat-card">
-                        <div class="stat-value">${totalEmissions.toFixed(0)}</div>
-                        <div class="stat-label">Total Emissions (kg CO₂/km²/day)</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${avgValue.toFixed(1)}</div>
-                        <div class="stat-label">Average Emissions</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${reduction.toFixed(1)}%</div>
-                        <div class="stat-label">Total Reduction</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${maxValue.toFixed(0)}</div>
-                        <div class="stat-label">Peak Emissions</div>
-                    </div>
-                `;
-            } else if (type === 'difference') {
-                const reductions = data.grid.map(point => point.value);
-                const avgReduction = reductions.reduce((a, b) => a + b, 0) / reductions.length;
-                const maxReduction = Math.max(...reductions);
-                const minReduction = Math.min(...reductions);
-                
-                statsHTML = `
-                    <div class="stat-card">
-                        <div class="stat-value">${avgReduction.toFixed(1)}%</div>
-                        <div class="stat-label">Average Reduction</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${maxReduction.toFixed(1)}%</div>
-                        <div class="stat-label">Peak Reduction</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${minReduction.toFixed(1)}%</div>
-                        <div class="stat-label">Minimum Reduction</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-value">${(maxReduction - minReduction).toFixed(1)}%</div>
-                        <div class="stat-label">Reduction Range</div>
-                    </div>
-                `;
+             if (type === 'baseline') {
+                 statsHTML = `
+                     <div class="stats-card fade-in">
+                         <h3>📊 Baseline Emissions Statistics 📊</h3>
+                         <div class="stat-item">
+                             <span class="stat-label">🌍 Total Daily Emissions</span>
+                             <span class="stat-value">${totalEmissions.toLocaleString()} kg CO₂</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📏 Average per km²</span>
+                             <span class="stat-value">${avgValue.toFixed(1)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🔴 Peak Emissions</span>
+                             <span class="stat-value">${maxValue.toFixed(0)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🟢 Minimum Emissions</span>
+                             <span class="stat-value">${minValue.toFixed(0)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📈 Median Emissions</span>
+                             <span class="stat-value">${medianValue.toFixed(1)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📊 Standard Deviation</span>
+                             <span class="stat-value">${stdDev.toFixed(1)} kg CO₂/km²/day</span>
+                         </div>
+                     </div>
+                     
+                     <div class="stats-card fade-in">
+                         <h3>📈 Distribution Analysis 📈</h3>
+                         <div class="stat-item">
+                             <span class="stat-label">📊 25th Percentile</span>
+                             <span class="stat-value">${percentile25.toFixed(1)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📊 75th Percentile</span>
+                             <span class="stat-value">${percentile75.toFixed(1)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📊 90th Percentile</span>
+                             <span class="stat-value">${percentile90.toFixed(1)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📊 95th Percentile</span>
+                             <span class="stat-value">${percentile95.toFixed(1)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📍 Data Points</span>
+                             <span class="stat-value">${values.length.toLocaleString()}</span>
+                         </div>
+                     </div>
+                     
+                     <div class="stats-card fade-in">
+                         <h3>🌱 Environmental Impact 🌱</h3>
+                         <div class="stat-item">
+                             <span class="stat-label">🌍 Daily CO₂ (Tons)</span>
+                             <span class="stat-value">${co2Tons.toFixed(1)} tons/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🚗 Equivalent Cars</span>
+                             <span class="stat-value">${equivalentCars.toLocaleString()} cars/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🌳 Trees Needed</span>
+                             <span class="stat-value">${equivalentTrees.toLocaleString()} trees</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📊 Carbon Footprint</span>
+                             <span class="stat-value">Grade ${co2Tons > 1000 ? 'F' : co2Tons > 500 ? 'D' : co2Tons > 200 ? 'C' : co2Tons > 100 ? 'B' : 'A'}</span>
+                         </div>
+                     </div>
+                     
+                     <div class="stats-card fade-in">
+                         <h3>❤️ Health Impact ❤️</h3>
+                         <div class="stat-item">
+                             <span class="stat-label">💔 Estimated Premature Deaths</span>
+                             <span class="stat-value">${prematureDeaths.toFixed(2)} deaths/year</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🫁 Estimated Asthma Cases</span>
+                             <span class="stat-value">${asthmaCases.toFixed(1)} cases/year</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🌬️ Air Quality Index</span>
+                             <span class="stat-value">${avgValue > 200 ? 'Hazardous' : avgValue > 150 ? 'Unhealthy' : avgValue > 100 ? 'Moderate' : 'Good'}</span>
+                         </div>
+                     </div>
+                     
+                     <div class="stats-card fade-in">
+                         <h3>💰 Economic Impact 💰</h3>
+                         <div class="stat-item">
+                             <span class="stat-label">🏥 Health Costs</span>
+                             <span class="stat-value">$${healthCosts.toLocaleString()}/year</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📉 Productivity Loss</span>
+                             <span class="stat-value">$${productivityLoss.toLocaleString()}/year</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">💸 Total Economic Impact</span>
+                             <span class="stat-value">$${(healthCosts + productivityLoss).toLocaleString()}/year</span>
+                         </div>
+                     </div>
+                 `;
+             } else if (type === 'simulation') {
+                 const comparisonStats = comparisonData ? calculateComparisonStats(data, comparisonData) : null;
+                 
+                 statsHTML = `
+                     <div class="stats-card fade-in">
+                         <h3>📈 Simulation Results 📈</h3>
+                         <div class="stat-item">
+                             <span class="stat-label">🌍 Total Daily Emissions</span>
+                             <span class="stat-value">${totalEmissions.toLocaleString()} kg CO₂</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📏 Average per km²</span>
+                             <span class="stat-value">${avgValue.toFixed(1)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🔴 Peak Emissions</span>
+                             <span class="stat-value">${maxValue.toFixed(0)} kg CO₂/km²/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🟢 Minimum Emissions</span>
+                             <span class="stat-value">${minValue.toFixed(0)} kg CO₂/km²/day</span>
+                         </div>
+                         ${comparisonStats ? `
+                         <div class="stat-item">
+                             <span class="stat-label">🌱 Total Reduction</span>
+                             <span class="stat-value" style="color: #16a34a;">${comparisonStats.totalReduction.toLocaleString()} kg CO₂/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">📊 Percent Reduction</span>
+                             <span class="stat-value" style="color: #16a34a;">${comparisonStats.percentReduction.toFixed(1)}%</span>
+                         </div>
+                         ` : ''}
+                     </div>
+                     
+                     <div class="stats-card fade-in">
+                         <h3>🏆 Impact Assessment 🏆</h3>
+                         ${comparisonStats ? `
+                         <div class="stat-item">
+                             <span class="stat-label">⭐ Improvement Score</span>
+                             <span class="stat-value" style="color: #16a34a;">${(comparisonStats.percentReduction / 10).toFixed(1)}/10</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🌍 CO₂ Reduction (Tons)</span>
+                             <span class="stat-value" style="color: #16a34a;">${(comparisonStats.totalReduction * 0.001).toFixed(1)} tons/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🚗 Equivalent Cars Removed</span>
+                             <span class="stat-value" style="color: #16a34a;">${(comparisonStats.totalReduction / 4.6).toLocaleString()} cars/day</span>
+                         </div>
+                         <div class="stat-item">
+                             <span class="stat-label">🌳 Trees Equivalent</span>
+                             <span class="stat-value" style="color: #16a34a;">${(comparisonStats.totalReduction / (22 / 365)).toLocaleString()} trees</span>
+                         </div>
+                         ` : `
+                         <div class="stat-item">
+                             <span class="stat-label">⚠️ No baseline comparison available</span>
+                             <span class="stat-value">Load baseline first</span>
+                         </div>
+                         `}
+                     </div>
+                 `;
             }
             
             statsGrid.innerHTML = statsHTML;
         }
 
-        async function simulate() {
-            const prompt = document.getElementById('prompt').value.trim();
-            if (!prompt) {
-                updateStatus('Please enter a prompt', 'error');
-                return;
-            }
+        // Calculate comparison statistics
+        function calculateComparisonStats(current, baseline) {
+            const currentValues = current.map(point => point.value);
+            const baselineValues = baseline.map(point => point.value);
             
-            const simulateBtn = document.getElementById('simulateBtn');
-            simulateBtn.disabled = true;
-            simulateBtn.textContent = 'Simulating...';
+            const currentTotal = currentValues.reduce((a, b) => a + b, 0);
+            const baselineTotal = baselineValues.reduce((a, b) => a + b, 0);
+            
+            const totalReduction = baselineTotal - currentTotal;
+            const percentReduction = (totalReduction / baselineTotal) * 100;
+            
+            return {
+                totalReduction: totalReduction,
+                percentReduction: percentReduction
+            };
+        }
 
-            try {
-                // Load baseline if not already loaded
-                if (!baseline) {
-                    updateStatus('Loading baseline data...', 'info');
-                    const baselineResponse = await fetch('http://localhost:8000/api/baseline');
-                    if (!baselineResponse.ok) throw new Error('Failed to load baseline');
-                    baseline = await baselineResponse.json();
-                }
-
-                // Run simulation
-                updateStatus('Running AI simulation...', 'info');
-                const response = await fetch('http://localhost:8000/api/simulate', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ prompt })
-                });
-
-                if (!response.ok) throw new Error('Simulation failed');
-
-                simulation = await response.json();
-                
-                // Show AI analysis if available
-                if (simulation.ai_analysis) {
-                    const aiSection = document.getElementById('ai-analysis');
-                    const aiContent = document.getElementById('analysis-content');
-                    aiContent.textContent = simulation.ai_analysis;
-                    aiSection.style.display = 'block';
-                }
-
-                // Show simulation results by default
-                showSimulation();
-                
-                updateStatus('Simulation completed successfully!', 'success');
-
-            } catch (error) {
-                console.error('Simulation error:', error);
-                updateStatus(`Error: ${error.message}`, 'error');
-            } finally {
-                simulateBtn.disabled = false;
-                simulateBtn.textContent = 'Simulate Impact';
-            }
+        // Show AI analysis
+        function showAIAnalysis(analysis) {
+            const aiAnalysis = document.getElementById('aiAnalysis');
+            const aiContent = document.getElementById('aiContent');
+            
+            aiContent.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <strong>Geographic Analysis:</strong> ${analysis.geographic_analysis || 'Analysis not available'}
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <strong>Spatial Reasoning:</strong> ${analysis.spatial_reasoning || 'Reasoning not available'}
+                </div>
+                <div>
+                    <strong>Real-World Factors:</strong> ${analysis.real_world_factors || 'Factors not available'}
+                </div>
+            `;
+            
+            aiAnalysis.style.display = 'block';
+            aiAnalysis.classList.add('fade-in');
         }
 
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
-            
-            // Load baseline data on startup
-            fetch('http://localhost:8000/api/baseline')
-                .then(response => response.json())
-                .then(data => {
-                    baseline = data;
-                    updateStatus('Baseline data loaded. Ready to simulate!', 'success');
-                })
-                .catch(error => {
+            loadBaseline();
+        });
+    </script>
+</body>
+</html>
                     console.error('Failed to load baseline:', error);
                     updateStatus('Failed to load baseline data. Make sure backend is running.', 'error');
                 });
         });
-
+        
         // Allow Enter key to trigger simulation
+
         document.getElementById('prompt').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 simulate();
@@ -782,4 +1159,5 @@
         });
     </script>
 </body>
+
 </html>
