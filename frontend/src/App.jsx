@@ -323,6 +323,7 @@ function App() {
   const [conversationHistory, setConversationHistory] = useState([])
   const [activeConversationIndex, setActiveConversationIndex] = useState(null)
   const [showHistory, setShowHistory] = useState(true)
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false)
   
   // Intro screen state
   const [showIntro, setShowIntro] = useState(true)
@@ -333,8 +334,8 @@ function App() {
   
   // Draggable sidebar state
   const [sidebarPosition, setSidebarPosition] = useState(() => {
-    const saved = localStorage.getItem('co2unt_sidebar_position')
-    return saved ? JSON.parse(saved) : { top: '80px', right: '20px' }
+    const saved = localStorage.getItem('co2unt_sidebar_position_expanded')
+    return saved ? JSON.parse(saved) : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
   })
   const [isDragging, setIsDragging] = useState(false)
   const sidebarRef = useRef(null)
@@ -369,6 +370,7 @@ function App() {
   
   // Draggable sidebar handlers
   const handleMouseDown = (e) => {
+    if (!isHistoryExpanded) return // Only allow drag when expanded
     // Allow dragging from ANYWHERE in the sidebar
     e.preventDefault() // Prevent text selection while dragging
     setIsDragging(true)
@@ -393,7 +395,8 @@ function App() {
       setSidebarPosition({
         left: `${Math.max(0, Math.min(newLeft, maxX))}px`,
         top: `${Math.max(0, Math.min(newTop, maxY))}px`,
-        right: 'auto'
+        right: 'auto',
+        transform: 'none'
       })
     }
     
@@ -401,7 +404,7 @@ function App() {
       if (isDragging) {
         setIsDragging(false)
         // Save position
-        localStorage.setItem('co2unt_sidebar_position', JSON.stringify(sidebarPosition))
+        localStorage.setItem('co2unt_sidebar_position_expanded', JSON.stringify(sidebarPosition))
       }
     }
     
@@ -414,8 +417,23 @@ function App() {
       }
     }
   }, [isDragging, sidebarPosition])
-  
-  // Minimize feature removed - sidebar always visible
+
+  // Handle Esc key to minimize the history panel
+  useEffect(() => {
+    const handleEscKey = (e) => {
+      if (e.key === 'Escape' && isHistoryExpanded) {
+        setIsHistoryExpanded(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscKey)
+    return () => document.removeEventListener('keydown', handleEscKey)
+  }, [isHistoryExpanded])
+
+  // Toggle history expansion
+  const toggleHistoryExpansion = () => {
+    setIsHistoryExpanded(!isHistoryExpanded)
+  }
   
   const loadBaseline = async () => {
     try {
@@ -607,49 +625,80 @@ function App() {
   
   return (
     <div className="app">
-      {/* Conversation History Sidebar */}
-      {showHistory && conversationHistory.length > 0 && (
-        <aside 
+      {/* Conversation History - Minimized Pill (Bottom-left) */}
+      {conversationHistory.length > 0 && !isHistoryExpanded && (
+        <button
+          className="history-pill glass"
+          onClick={toggleHistoryExpansion}
+          title="Open conversation history (Esc to close)"
+          aria-label={`Open conversation history. ${conversationHistory.length} conversation${conversationHistory.length > 1 ? 's' : ''}`}
+        >
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span className="history-pill-count">{conversationHistory.length}</span>
+          <span className="history-pill-text">History</span>
+        </button>
+      )}
+
+      {/* Conversation History - Expanded Card/Panel (Overlay) */}
+      {conversationHistory.length > 0 && isHistoryExpanded && (
+        <aside
           ref={sidebarRef}
-          className={`conversation-sidebar glass slide-in-left draggable ${isDragging ? 'dragging' : ''}`}
+          className={`conversation-card glass ${isDragging ? 'dragging' : ''}`}
           style={sidebarPosition}
           onMouseDown={handleMouseDown}
+          role="dialog"
+          aria-label="Conversation history"
+          aria-modal="false"
         >
-          <div className="conversation-header" style={{ cursor: 'move' }}>
+          <div className="conversation-card-header" style={{ cursor: 'move' }}>
             <div className="conversation-header-title" style={{ flex: 1, cursor: 'move' }}>
-              <span className="drag-handle" title="Drag to move" style={{ cursor: 'move', fontSize: '18px', marginRight: '8px' }}>⋮⋮</span>
-              <h3 className="sidebar-title" style={{ cursor: 'move' }}>Conversation History</h3>
+              <span className="drag-handle" title="Drag to move" style={{ cursor: 'move', fontSize: '18px', marginRight: '8px' }} aria-hidden="true">⋮⋮</span>
+              <h2 className="sidebar-title" style={{ cursor: 'move' }}>Conversation History</h2>
             </div>
             <div className="conversation-header-controls" style={{ display: 'flex', gap: '6px' }}>
-              <button 
-                className="header-control-btn" 
-                onClick={(e) => { e.stopPropagation(); setShowHistory(false); }}
-                title="Close sidebar"
+              <button
+                className="header-control-btn minimize-btn"
+                onClick={(e) => { e.stopPropagation(); setIsHistoryExpanded(false); }}
+                title="Minimize (Esc)"
+                aria-label="Minimize conversation history"
                 style={{ cursor: 'pointer' }}
               >
-                ✕
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
             </div>
           </div>
-          
-          <div className="conversation-list">
+
+          <div className="conversation-list" role="list">
             {conversationHistory.map((conv, index) => (
               <div
                 key={conv.id}
                 className={`conversation-item ${activeConversationIndex === index ? 'active' : ''}`}
                 onClick={() => loadConversation(index)}
+                role="listitem"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    loadConversation(index)
+                  }
+                }}
+                aria-label={`Conversation ${index + 1}: ${conv.prompt}`}
               >
-                <button 
+                <button
                   className="delete-conversation-btn"
                   onClick={(e) => deleteConversation(index, e)}
                   title="Delete this conversation"
-                  aria-label="Delete conversation"
+                  aria-label={`Delete conversation ${index + 1}`}
                 >
-                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14">
+                  <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
-                
+
                 <div className="conversation-header">
                   <span className="conversation-number">#{index + 1}</span>
                   <span className="conversation-time">
@@ -670,7 +719,7 @@ function App() {
                           {conv.statistics?.is_increase ? '+' : '-'}{conv.statistics?.percentage_reduction || 0}%
                         </span>
                         <span className="stat-value">
-                          {conv.statistics?.is_increase 
+                          {conv.statistics?.is_increase
                             ? `+${formatAnnualEmissions(Math.abs(conv.statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} added`
                             : `${formatAnnualEmissions(Math.abs(conv.statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} saved`
                           }
@@ -683,20 +732,6 @@ function App() {
             ))}
           </div>
         </aside>
-      )}
-      
-      {/* Toggle History Button (when hidden) */}
-      {!showHistory && conversationHistory.length > 0 && (
-        <button 
-          className="toggle-history-btn glass"
-          onClick={() => setShowHistory(true)}
-          title="Show history"
-        >
-          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="20" height="20">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>{conversationHistory.length}</span>
-        </button>
       )}
       
       {/* Premium Header with Logo */}
@@ -726,7 +761,7 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <div className={`main-content fade-in ${showHistory && conversationHistory.length > 0 ? 'with-sidebar' : ''}`}>
+      <div className="main-content fade-in">
         {/* Control Panel */}
         <div className="control-panel glass">
           <h2 className="panel-title">Simulation Controls</h2>
