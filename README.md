@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # NYC CO₂ Sustainability Simulation
 
 An AI-powered climate action visualization tool for New York City that simulates the environmental impact of sustainability interventions.
@@ -23,14 +22,27 @@ This application uses artificial intelligence to parse natural language prompts 
 - Modern web browser
 
 ### Backend Setup
-```bash
+**Windows**
+```
 cd backend
+python -m venv venv
+venv\Scripts\activate
 pip install -r requirements.txt
 python main.py
 ```
 
+**macOS**
+```
+cd backend
+pip3 -m venv venv
+source venv/bin/activate
+pip3 install -r requirements.txt
+python main.py
+```
+
 ### Frontend Setup
-```bash
+**Windows & macOS**
+```
 cd frontend
 npm install
 npm run dev
@@ -144,4 +156,3 @@ Contributions are welcome! Please feel free to submit issues and pull requests.
 **Built with ❤️ for NYC's sustainable future**
 =======
 # gatorhacks2025
->>>>>>> d51fb2eede04ccc5e82fc4f1049d793484ed54b3
