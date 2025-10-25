@@ -427,6 +427,9 @@ body::after {
     resize: vertical;
     min-height: 100px;
     transition: all 0.3s ease;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 .prompt-input:focus {
@@ -545,6 +548,10 @@ body::after {
     text-align: left;
     cursor: pointer;
     transition: all 0.3s ease;
+    white-space: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
 }
 
 .prompt-chip:hover:not(:disabled) {

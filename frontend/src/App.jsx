@@ -335,7 +335,17 @@ function App() {
   // Draggable sidebar state
   const [sidebarPosition, setSidebarPosition] = useState(() => {
     const saved = localStorage.getItem('co2unt_sidebar_position_expanded')
-    return saved ? JSON.parse(saved) : { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Clean up old centered position format (has transform property)
+      if (parsed.transform) {
+        localStorage.removeItem('co2unt_sidebar_position_expanded')
+        return { bottom: '2rem', left: '2rem' }
+      }
+      return parsed
+    }
+    // Default to bottom-left corner on first open
+    return { bottom: '2rem', left: '2rem' }
   })
   const [isDragging, setIsDragging] = useState(false)
   const sidebarRef = useRef(null)
@@ -422,16 +432,22 @@ function App() {
   useEffect(() => {
     const handleEscKey = (e) => {
       if (e.key === 'Escape' && isHistoryExpanded) {
+        // Save position before minimizing
+        localStorage.setItem('co2unt_sidebar_position_expanded', JSON.stringify(sidebarPosition))
         setIsHistoryExpanded(false)
       }
     }
 
     document.addEventListener('keydown', handleEscKey)
     return () => document.removeEventListener('keydown', handleEscKey)
-  }, [isHistoryExpanded])
+  }, [isHistoryExpanded, sidebarPosition])
 
   // Toggle history expansion
   const toggleHistoryExpansion = () => {
+    if (isHistoryExpanded) {
+      // Save position before minimizing
+      localStorage.setItem('co2unt_sidebar_position_expanded', JSON.stringify(sidebarPosition))
+    }
     setIsHistoryExpanded(!isHistoryExpanded)
   }
   
@@ -518,15 +534,26 @@ function App() {
       setIntervention(null)
       setStatistics(null)
       setCurrentView('baseline')
+      // Reset position to bottom-left corner and minimize
+      localStorage.removeItem('co2unt_sidebar_position_expanded')
+      setSidebarPosition({ bottom: '2rem', left: '2rem' })
+      setIsHistoryExpanded(false) // Minimize the card
     }
   }
   
   const deleteConversation = (index, event) => {
     event.stopPropagation() // Prevent triggering the card click
-    
+
     const newHistory = conversationHistory.filter((_, i) => i !== index)
     setConversationHistory(newHistory)
-    
+
+    // If this was the last conversation, reset position and minimize
+    if (newHistory.length === 0) {
+      localStorage.removeItem('co2unt_sidebar_position_expanded')
+      setSidebarPosition({ bottom: '2rem', left: '2rem' })
+      setIsHistoryExpanded(false) // Minimize the card
+    }
+
     // If we deleted the active conversation, handle it
     if (activeConversationIndex === index) {
       // Switch to the previous conversation, or baseline if none left

@@ -105,11 +105,11 @@
 @keyframes expandCard {
     from {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.8);
+        transform: scale(0.85);
     }
     to {
         opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
+        transform: scale(1);
     }
 }
 
@@ -386,9 +386,6 @@
         width: 95vw;
         max-width: 95vw;
         max-height: 80vh;
-        left: 50% !important;
-        top: 50% !important;
-        transform: translate(-50%, -50%) !important;
     }
 
     .conversation-card-header {
