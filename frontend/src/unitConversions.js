@@ -125,9 +125,9 @@ export function getLegendRanges(unit = 'metric') {
  */
 export function formatLegendRange(min, max, unit = 'metric') {
   if (max === Infinity) {
-    return `>${min}`;
+    return `>${min.toLocaleString()}`;
   }
-  return `${min}-${max}`;
+  return `${min.toLocaleString()}-${max.toLocaleString()}`;
 }
 
 /**
