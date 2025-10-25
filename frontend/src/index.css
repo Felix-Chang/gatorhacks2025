@@ -85,7 +85,7 @@ body::after {
 }
 
 .status-bar {
-    @apply flex items-center justify-center gap-4 p-4 bg-black bg-opacity-30 rounded-2xl backdrop-blur-lg border border-white border-opacity-20;
+    @apply flex items-center justify-center gap-4 p-4 bg-black/30 rounded-2xl backdrop-blur-lg border border-white/20;
 }
 
 .status-indicator {
@@ -93,15 +93,21 @@ body::after {
 }
 
 .status-success {
-    @apply bg-green-600 bg-opacity-30 text-green-200 border border-green-500 border-opacity-50;
+    background-color: rgba(34, 197, 94, 0.3);
+    border-color: rgba(34, 197, 94, 0.5);
+    @apply border text-green-200;
 }
 
 .status-error {
-    @apply bg-red-600 bg-opacity-30 text-red-200 border border-red-500 border-opacity-50;
+    background-color: rgba(220, 38, 38, 0.3);
+    border-color: rgba(220, 38, 38, 0.5);
+    @apply border text-red-200;
 }
 
 .status-loading {
-    @apply bg-earth-green-600 bg-opacity-30 text-green-200 border border-earth-green-500 border-opacity-50;
+    background-color: rgba(45, 80, 22, 0.3);
+    border-color: rgba(45, 80, 22, 0.5);
+    @apply border text-green-200;
 }
 
 .main-content {
@@ -109,11 +115,12 @@ body::after {
 }
 
 .control-panel {
-    @apply bg-white bg-opacity-95 p-8 rounded-3xl shadow-2xl backdrop-blur-lg h-fit;
+    @apply bg-white/95 p-8 rounded-3xl shadow-2xl backdrop-blur-lg h-fit;
 }
 
 .control-panel h2 {
-    @apply text-2xl font-semibold mb-5 text-earth-green-600;
+    color: #4a7c59;
+    @apply text-2xl font-semibold mb-5;
 }
 
 .input-group {
@@ -121,7 +128,8 @@ body::after {
 }
 
 .input-group label {
-    @apply block font-medium mb-2 text-earth-green-500;
+    color: #4a7c59;
+    @apply block font-medium mb-2;
 }
 
 .input-group input,
@@ -131,7 +139,9 @@ body::after {
 
 .input-group input:focus,
 .input-group textarea:focus {
-    @apply outline-none border-earth-green-500 shadow-lg shadow-earth-green-200;
+    border-color: #4a7c59;
+    box-shadow: 0 10px 30px rgba(186, 220, 204, 0.6);
+    @apply outline-none;
 }
 
 .input-group textarea {
@@ -143,19 +153,26 @@ body::after {
 }
 
 .btn-primary {
-    @apply bg-gradient-to-r from-earth-green-600 via-earth-green-500 to-earth-green-400 text-white shadow-lg shadow-earth-green-300;
+    background-image: linear-gradient(to right, #2d5016, #4a7c59, #5bb85b);
+    box-shadow: 0 20px 40px rgba(91, 184, 91, 0.35);
+    @apply text-white;
 }
 
 .btn-primary:hover {
-    @apply transform -translate-y-1 shadow-xl shadow-earth-green-400;
+    transform: translateY(-0.25rem);
+    box-shadow: 0 24px 50px rgba(91, 184, 91, 0.45);
 }
 
 .btn-secondary {
-    @apply bg-white bg-opacity-90 text-earth-green-600 border-2 border-earth-green-500;
+    background-color: rgba(255, 255, 255, 0.9);
+    color: #2d5016;
+    border-color: #4a7c59;
+    @apply border-2;
 }
 
 .btn-secondary:hover {
-    @apply bg-earth-green-500 text-white;
+    background-color: #4a7c59;
+    color: #ffffff;
 }
 
 .btn:disabled {
@@ -167,19 +184,24 @@ body::after {
 }
 
 .example-prompts h3 {
-    @apply text-lg font-semibold mb-4 text-earth-green-500;
+    color: #4a7c59;
+    @apply text-lg font-semibold mb-4;
 }
 
 .prompt-example {
-    @apply p-3 bg-earth-green-100 border border-earth-green-200 rounded-lg mb-3 cursor-pointer transition-all duration-300 text-sm;
+    background-color: #dcf2dc;
+    border-color: #bce5bc;
+    @apply p-3 rounded-lg mb-3 cursor-pointer transition-all duration-300 text-sm border;
 }
 
 .prompt-example:hover {
-    @apply bg-earth-green-200 transform translate-x-1;
+    background-color: #bce5bc;
+    transform: translateX(0.25rem);
 }
 
 .map-container {
-    @apply bg-white bg-opacity-95 p-8 rounded-3xl shadow-2xl backdrop-blur-lg;
+    background-color: rgba(255, 255, 255, 0.95);
+    @apply p-8 rounded-3xl shadow-2xl backdrop-blur-lg;
 }
 
 .map-header {
@@ -187,7 +209,8 @@ body::after {
 }
 
 .map-header h2 {
-    @apply text-2xl font-semibold text-earth-green-600;
+    color: #4a7c59;
+    @apply text-2xl font-semibold;
 }
 
 .map-controls {
@@ -195,15 +218,24 @@ body::after {
 }
 
 .map-btn {
-    @apply px-4 py-2 border-2 border-gray-200 bg-white rounded-lg cursor-pointer transition-all duration-300 font-medium text-sm;
+    color: #2d5016;
+    border-color: #4a7c59;
+    background-color: rgba(255, 255, 255, 0.85);
+    @apply px-4 py-2 rounded-xl border transition-all duration-300;
 }
 
 .map-btn.active {
-    @apply bg-earth-green-500 text-white border-earth-green-500;
+    background-color: #4a7c59;
+    color: #ffffff;
+}
+
+.map-btn:hover:not(.active) {
+    background-color: rgba(91, 184, 91, 0.15);
 }
 
 .map-btn:hover {
-    @apply border-earth-green-500 text-earth-green-500;
+    border-color: #4a7c59;
+    color: #2d5016;
 }
 
 .map-btn.active:hover {
@@ -223,7 +255,7 @@ body::after {
 }
 
 .popup-content {
-    @apply font-inter;
+    font-family: 'Inter', sans-serif;
 }
 
 .popup-content h4 {
@@ -235,15 +267,21 @@ body::after {
 }
 
 .legend {
-    @apply mt-5 p-5 bg-white bg-opacity-80 rounded-2xl;
+    background-color: rgba(255, 255, 255, 0.8);
+    @apply mt-5 p-5 rounded-2xl;
 }
 
 .legend h3 {
-    @apply text-lg font-semibold mb-4 text-earth-green-600;
+    color: #4a7c59;
+    @apply text-lg font-semibold mb-4;
 }
 
 .legend-item {
     @apply flex items-center gap-3 mb-3;
+}
+
+.legend-item span {
+    color: #2d5016;
 }
 
 .legend-color {
@@ -255,11 +293,13 @@ body::after {
 }
 
 .stats-card {
-    @apply bg-white bg-opacity-95 p-6 rounded-3xl shadow-2xl backdrop-blur-lg;
+    background-color: rgba(255, 255, 255, 0.95);
+    @apply p-6 rounded-3xl shadow-2xl backdrop-blur-lg;
 }
 
 .stats-card h3 {
-    @apply text-xl font-semibold mb-5 text-earth-green-600 flex items-center gap-3;
+    color: #4a7c59;
+    @apply text-xl font-semibold mb-5 flex items-center gap-3;
 }
 
 .stat-item {
@@ -271,27 +311,48 @@ body::after {
 }
 
 .stat-label {
-    @apply font-medium text-earth-green-500;
+    color: #4a7c59;
+    @apply font-medium;
 }
 
 .stat-value {
-    @apply font-semibold text-earth-green-600 text-right;
+    color: #2d5016;
+    @apply font-semibold text-right;
 }
 
 .ai-analysis {
-    @apply bg-white bg-opacity-95 p-6 rounded-3xl shadow-2xl backdrop-blur-lg mt-8;
+    background-color: rgba(255, 255, 255, 0.95);
+    @apply p-6 rounded-3xl shadow-2xl backdrop-blur-lg mt-8;
 }
 
 .ai-analysis h3 {
-    @apply text-xl font-semibold mb-4 text-earth-green-600 flex items-center gap-3;
+    color: #4a7c59;
+    @apply text-xl font-semibold mb-4 flex items-center gap-3;
 }
 
 .ai-content {
-    @apply bg-earth-green-100 p-5 rounded-2xl border-l-4 border-earth-green-500 text-sm leading-relaxed text-earth-green-600;
+    background-color: #dcf2dc;
+    border-left: 4px solid #4a7c59;
+    color: #2d5016;
+    @apply p-5 rounded-2xl text-sm leading-relaxed;
+}
+
+.ai-analysis p,
+.ai-analysis strong {
+    color: #2d5016;
+}
+
+.ai-box {
+    background-color: #dcf2dc;
+    border-left: 4px solid #4a7c59;
+    color: #2d5016;
+    @apply p-5 rounded-2xl text-sm leading-relaxed;
 }
 
 .loading-spinner {
-    @apply inline-block w-5 h-5 border-3 border-white border-opacity-30 rounded-full border-t-white animate-spin;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff;
+    @apply inline-block w-5 h-5 rounded-full animate-spin;
 }
 
 .fade-in {
