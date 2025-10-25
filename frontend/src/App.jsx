@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useMemo, useCallback, useDeferredValue, memo } from 'react'
 import axios from 'axios'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import L from 'leaflet'
@@ -11,6 +11,120 @@ L.Icon.Default.mergeOptions({
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 })
+
+const computeStats = (data) => {
+  if (!data || data.length === 0) {
+    return null
+  }
+
+  const values = data.map((point) => point.value)
+  const sortedValues = [...values].sort((a, b) => a - b)
+  const minValue = sortedValues[0]
+  const maxValue = sortedValues[sortedValues.length - 1]
+  const totalEmissions = values.reduce((sum, value) => sum + value, 0)
+  const avgValue = totalEmissions / values.length
+  const medianValue = sortedValues[Math.floor(sortedValues.length / 2)]
+
+  return {
+    minValue,
+    maxValue,
+    avgValue,
+    totalEmissions,
+    medianValue,
+    dataPoints: values.length,
+  }
+}
+
+const MAX_MARKERS_TO_RENDER = 800
+
+const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor }) {
+  const points = useMemo(() => {
+    if (!data || data.length === 0) return []
+    if (data.length <= MAX_MARKERS_TO_RENDER) return data
+
+    const step = Math.ceil(data.length / MAX_MARKERS_TO_RENDER)
+    return data.filter((_, index) => index % step === 0)
+  }, [data])
+
+  if (!points.length) {
+    return (
+      <div
+        style={{
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'rgba(255, 255, 255, 0.85)',
+          borderRadius: '24px',
+          color: '#2d5016',
+          fontWeight: 600,
+        }}
+      >
+        Loading map data…
+      </div>
+    )
+  }
+
+  const markerRadius = view === 'difference' ? 5 : 7
+
+  return (
+    <MapContainer center={[40.7128, -74.006]} zoom={11} className="map" key={view}>
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution="© OpenStreetMap contributors"
+      />
+
+      {points.map((point, index) => (
+        <CircleMarker
+          key={`${point.lat}-${point.lon}-${index}`}
+          center={[point.lat, point.lon]}
+          radius={markerRadius}
+          pathOptions={{
+            fillColor: getMarkerColor(point.value, view),
+            color: getMarkerColor(point.value, view),
+            weight: 1.5,
+            opacity: 0.75,
+            fillOpacity: 0.55,
+          }}
+        >
+          <Popup>
+            <div className="popup-content">
+              <h4>
+                {view === 'baseline'
+                  ? 'Baseline Emissions'
+                  : view === 'simulation'
+                    ? 'Simulation Results'
+                    : 'Impact Difference'}
+              </h4>
+              <p>
+                <strong>Location:</strong> {point.lat.toFixed(4)}, {point.lon.toFixed(4)}
+              </p>
+              {view === 'difference' ? (
+                <>
+                  <p>
+                    <strong>Reduction:</strong> {point.value.toFixed(1)}%
+                  </p>
+                  <p>
+                    <strong>Before:</strong> {point.baselineValue?.toFixed(2) ?? '—'} kg CO₂/km²/day
+                  </p>
+                  <p>
+                    <strong>After:</strong> {point.simulationValue?.toFixed(2) ?? '—'} kg CO₂/km²/day
+                  </p>
+                </>
+              ) : (
+                <p>
+                  <strong>Emissions:</strong> {point.value.toFixed(2)} kg CO₂/km²/day
+                </p>
+              )}
+            </div>
+          </Popup>
+        </CircleMarker>
+      ))}
+    </MapContainer>
+  )
+})
+
+EmissionsMap.displayName = 'EmissionsMap'
 
 function App() {
   const [prompt, setPrompt] = useState('')
@@ -60,32 +174,38 @@ function App() {
     setPrompt(examplePrompt)
   }
 
-  const getMapData = () => {
-    switch (currentView) {
-      case 'baseline':
-        return baseline
-      case 'simulation':
-        return simulation
-      case 'difference':
-        if (!baseline || !simulation) return null
-        return baseline.map((baselinePoint, index) => {
-          const simPoint = simulation[index]
-          const reduction = baselinePoint.value - simPoint.value
-          const reductionPercent = (reduction / baselinePoint.value) * 100
-          return {
-            lat: baselinePoint.lat,
-            lon: baselinePoint.lon,
-            value: reductionPercent,
-            baselineValue: baselinePoint.value,
-            simulationValue: simPoint.value
-          }
-        })
-      default:
-        return baseline
-    }
-  }
+  const baselineMaxValue = useMemo(() => {
+    if (!baseline || baseline.length === 0) return 0
+    return baseline.reduce((max, point) => (point.value > max ? point.value : max), 0)
+  }, [baseline])
 
-  const getMarkerColor = (value, view) => {
+  const differenceData = useMemo(() => {
+    if (!baseline || !simulation) return null
+    return baseline.map((baselinePoint, index) => {
+      const simPoint = simulation?.[index] ?? baselinePoint
+      const reduction = baselinePoint.value - simPoint.value
+      const reductionPercent = baselinePoint.value ? (reduction / baselinePoint.value) * 100 : 0
+      return {
+        lat: baselinePoint.lat,
+        lon: baselinePoint.lon,
+        value: reductionPercent,
+        baselineValue: baselinePoint.value,
+        simulationValue: simPoint.value
+      }
+    })
+  }, [baseline, simulation])
+
+  const mapData = useMemo(() => {
+    if (currentView === 'difference') return differenceData
+    if (currentView === 'simulation') return simulation
+    return baseline
+  }, [currentView, baseline, simulation, differenceData])
+
+  const deferredMapData = useDeferredValue(mapData)
+
+  const stats = useMemo(() => computeStats(mapData), [mapData])
+
+  const getMarkerColor = useCallback((value, view) => {
     if (view === 'difference') {
       if (value > 50) return '#00ff00'
       if (value > 25) return '#88ff00'
@@ -93,40 +213,16 @@ function App() {
       if (value > 0) return '#ff8800'
       return '#ff0000'
     }
-    
-    // For baseline and simulation views
-    const maxValue = Math.max(...(baseline?.map(p => p.value) || [0]))
-    const normalizedIntensity = value / maxValue
-    
+
+    if (!baselineMaxValue) return '#44ff44'
+    const normalizedIntensity = value / baselineMaxValue
+
     if (normalizedIntensity > 0.8) return '#ff4444'
     if (normalizedIntensity > 0.6) return '#ff8844'
     if (normalizedIntensity > 0.4) return '#ffaa44'
     if (normalizedIntensity > 0.2) return '#88ff44'
     return '#44ff44'
-  }
-
-  const calculateStats = (data) => {
-    if (!data) return null
-    
-    const values = data.map(point => point.value)
-    const minValue = Math.min(...values)
-    const maxValue = Math.max(...values)
-    const avgValue = values.reduce((a, b) => a + b, 0) / values.length
-    const totalEmissions = values.reduce((a, b) => a + b, 0)
-    const medianValue = values.sort((a, b) => a - b)[Math.floor(values.length / 2)]
-    
-    return {
-      minValue,
-      maxValue,
-      avgValue,
-      totalEmissions,
-      medianValue,
-      dataPoints: values.length
-    }
-  }
-
-  const mapData = getMapData()
-  const stats = calculateStats(mapData)
+  }, [baselineMaxValue])
 
   return (
     <div className="app">
@@ -227,45 +323,7 @@ function App() {
           </div>
           
           <div className="map-wrapper">
-            <MapContainer center={[40.7128, -74.0060]} zoom={11} className="map">
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='© OpenStreetMap contributors'
-              />
-              
-              {mapData && mapData.map((point, index) => (
-                <CircleMarker
-                  key={index}
-                  center={[point.lat, point.lon]}
-                  radius={currentView === 'difference' ? 5 : 8}
-                  pathOptions={{
-                    fillColor: getMarkerColor(point.value, currentView),
-                    color: getMarkerColor(point.value, currentView),
-                    weight: 2,
-                    opacity: 0.8,
-                    fillOpacity: 0.6
-                  }}
-                >
-                  <Popup>
-                    <div className="popup-content">
-                      <h4>{currentView === 'baseline' ? 'Baseline Emissions' : 
-                           currentView === 'simulation' ? 'Simulation Results' : 
-                           'Impact Difference'}</h4>
-                      <p><strong>Location:</strong> {point.lat.toFixed(4)}, {point.lon.toFixed(4)}</p>
-                      {currentView === 'difference' ? (
-                        <>
-                          <p><strong>Reduction:</strong> {point.value.toFixed(1)}%</p>
-                          <p><strong>Before:</strong> {point.baselineValue.toFixed(2)} kg CO₂/km²/day</p>
-                          <p><strong>After:</strong> {point.simulationValue.toFixed(2)} kg CO₂/km²/day</p>
-                        </>
-                      ) : (
-                        <p><strong>Emissions:</strong> {point.value.toFixed(2)} kg CO₂/km²/day</p>
-                      )}
-                    </div>
-                  </Popup>
-                </CircleMarker>
-              ))}
-            </MapContainer>
+            <EmissionsMap data={deferredMapData} view={currentView} getMarkerColor={getMarkerColor} />
           </div>
           
           <div className="legend">
