@@ -18,12 +18,42 @@ This application uses artificial intelligence to parse natural language prompts 
 
 ## 🚀 Quick Start
 
+### Cloning the Repo
+
+Git Large File Storage (LFS) is required to handle large datasets or model files in this project. Install Git LFS:
+
+**Windows**
+```
+git lfs install
+```
+
+**macOS**
+```
+brew install git-lfs
+```
+
+Then, clone the repository:
+```
+git clone https://github.com/Felix-Chang/gatorhacks2025.git
+```
+
 ### Prerequisites
 - Python 3.11+
 - Node.js 18+
 - Modern web browser
 
 ### Backend Setup
+
+Before running the backend, create a `.env` file in the `backend` folder to store your API keys and configuration.  
+
+1. Inside the `backend` directory, create a new file called `.env`  
+2. Add your API keys and variables in the following format:
+
+OPENAQ_API_KEY=your_api_key_here
+
+3. Save the file. These variables will be automatically loaded when the backend starts.  
+4. **Do not commit** `.env` files to GitHub. They contain sensitive keys.  
+
 **Windows**
 ```
 cd backend
