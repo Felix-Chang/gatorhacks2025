@@ -88,7 +88,7 @@ const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, un
 
   // Dynamic marker radius based on zoom level
   const getMarkerRadius = (zoom) => {
-    const baseRadius = view === 'difference' ? 5 : 7
+    const baseRadius = 7 // Same base radius for all views
     // Scale radius based on zoom: more zoom = bigger markers
     // At zoom 11 (default): base radius
     // At zoom 15+: much larger markers
@@ -171,6 +171,7 @@ EmissionsMap.displayName = 'EmissionsMap'
 // Animated placeholder text component
 const AnimatedPlaceholder = () => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
+  const [isVisible, setIsVisible] = useState(true)
   const placeholders = [
     "Enter your climate intervention prompt...",
     "Convert 30% of taxis to electric vehicles...",
@@ -180,13 +181,36 @@ const AnimatedPlaceholder = () => {
   ]
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPlaceholderIndex((prev) => (prev + 1) % placeholders.length)
-    }, 3000)
-    return () => clearInterval(interval)
-  }, [])
+    const cyclePlaceholder = () => {
+      setIsVisible(false) // Start fade out
 
-  return <span className="animated-placeholder">{placeholders[placeholderIndex]}</span>
+      setTimeout(() => {
+        setPlaceholderIndex((prev) => (prev + 1) % placeholders.length) // Change text
+
+        // Use requestAnimationFrame to ensure DOM has updated before fading in
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setIsVisible(true) // Start fade in
+          })
+        })
+      }, 500) // Wait for fade out to complete
+    }
+
+    const interval = setInterval(cyclePlaceholder, 3500) // Increased to 3.5s to account for full transition
+    return () => clearInterval(interval)
+  }, [placeholders.length])
+
+  return (
+    <span
+      className="animated-placeholder"
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transition: 'opacity 0.5s ease-in-out'
+      }}
+    >
+      {placeholders[placeholderIndex]}
+    </span>
+  )
 }
 
 // Intro Screen Component with Typing Animation
