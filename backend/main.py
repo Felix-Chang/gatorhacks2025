@@ -1,5 +1,5 @@
 ﻿"""
-NYC COâ‚‚ Sustainability Simulation - FastAPI Backend
+NYC CO₂ Sustainability Simulation - FastAPI Backend
 Handles data fetching, processing, and AI-powered prompt interpretation
 """
 
@@ -70,7 +70,7 @@ async def root():
 @app.get("/api/baseline", response_model=BaselineResponse)
 async def get_baseline():
     """
-    Returns baseline NYC COâ‚‚ emissions grid
+    Returns baseline NYC CO2 emissions grid
     
     Combines real OpenAQ station data with synthetic gridded emissions
     based on NYC geography and known emission patterns
