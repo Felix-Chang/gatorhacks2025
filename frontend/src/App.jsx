@@ -171,6 +171,7 @@ EmissionsMap.displayName = 'EmissionsMap'
 // Animated placeholder text component
 const AnimatedPlaceholder = () => {
   const [placeholderIndex, setPlaceholderIndex] = useState(0)
+  const [isVisible, setIsVisible] = useState(true)
   const placeholders = [
     "Enter your climate intervention prompt...",
     "Convert 30% of taxis to electric vehicles...",
@@ -181,12 +182,26 @@ const AnimatedPlaceholder = () => {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setPlaceholderIndex((prev) => (prev + 1) % placeholders.length)
+      setIsVisible(false) // Start fade out
+      setTimeout(() => {
+        setPlaceholderIndex((prev) => (prev + 1) % placeholders.length) // Change text
+        setIsVisible(true) // Start fade in
+      }, 500) // Wait for fade out to complete
     }, 3000)
     return () => clearInterval(interval)
   }, [])
 
-  return <span className="animated-placeholder">{placeholders[placeholderIndex]}</span>
+  return (
+    <span
+      className="animated-placeholder"
+      style={{
+        opacity: isVisible ? 1 : 0,
+        transition: 'opacity 0.5s ease-in-out'
+      }}
+    >
+      {placeholders[placeholderIndex]}
+    </span>
+  )
 }
 
 // Intro Screen Component with Typing Animation
