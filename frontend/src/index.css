@@ -449,6 +449,7 @@ body::after {
     position: absolute;
     top: 1rem;
     left: 1rem;
+    right: 1rem;
     color: var(--text-muted);
     pointer-events: none;
     font-size: 1rem;

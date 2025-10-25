@@ -181,15 +181,24 @@ const AnimatedPlaceholder = () => {
   ]
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const cyclePlaceholder = () => {
       setIsVisible(false) // Start fade out
+
       setTimeout(() => {
         setPlaceholderIndex((prev) => (prev + 1) % placeholders.length) // Change text
-        setIsVisible(true) // Start fade in
+
+        // Use requestAnimationFrame to ensure DOM has updated before fading in
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setIsVisible(true) // Start fade in
+          })
+        })
       }, 500) // Wait for fade out to complete
-    }, 3000)
+    }
+
+    const interval = setInterval(cyclePlaceholder, 3500) // Increased to 3.5s to account for full transition
     return () => clearInterval(interval)
-  }, [])
+  }, [placeholders.length])
 
   return (
     <span
