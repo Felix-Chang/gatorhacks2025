@@ -1,6 +1,6 @@
 # CarbonIQ
 
-**An AI-powered climate impact simulator for New York City**
+**An AI-powered climate impact simulator**
 
 CarbonIQ uses artificial intelligence and real NYC data to simulate the environmental impact of sustainability interventions across all five boroughs.
 
