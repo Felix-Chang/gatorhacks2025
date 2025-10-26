@@ -874,10 +874,11 @@ Be specific about NYC landmarks, neighborhoods, and geographic features."""
         """
         modifications = []
         
-        # Scale factor: 10% should give smaller change_percent than 30%
-        # For taxis: 10% → -4%, 30% → -12% (roughly 3x difference)
-        # We'll use the percentage directly as a scaling factor
-        base_change_percent = abs(reduction_percent) * 0.2  # Base multiplier
+        # Use the percentage directly as the change_percent (with some scaling down)
+        # 10% → -10%, 30% → -30%, etc.
+        # But we'll scale it down by 0.6 to make it more realistic
+        # So 10% → -6%, 30% → -18%
+        base_change_percent = percent * 0.6
         
         # If borough is not citywide, apply changes to that borough
         if borough != "citywide":
