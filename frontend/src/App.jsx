@@ -961,7 +961,7 @@ function App() {
                 <div className="stat-divider">→</div>
                 <div className="stat-col">
                   <span className="stat-label-featured">After Intervention</span>
-                  <span className="stat-value-featured success">{formatAnnualEmissions(statistics?.reduced_tons_co2 || 0, unitSystem, false)} / year</span>
+                  <span className={`stat-value-featured ${statistics?.is_increase ? 'increase' : 'success'}`}>{formatAnnualEmissions(statistics?.reduced_tons_co2 || 0, unitSystem, false)} / year</span>
                 </div>
               </div>
               <div className="stat-savings">
