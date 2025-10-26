@@ -684,6 +684,10 @@ body::after {
     color: var(--text-muted);
     font-family: 'Courier New', monospace;
     padding-left: 0.5rem;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+    margin-top: 2px;
 }
 
 .legend-color {

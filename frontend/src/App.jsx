@@ -1002,7 +1002,7 @@ function App() {
             <div className="stat-card glass">
               <h3 className="stat-card-title">Grid Statistics</h3>
               <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '1rem', lineHeight: '1.4' }}>
-                Coverage: ~2,249 km² grid (NYC + water bodies). Values are emission intensities (tonnes CO₂/km²/day).
+                Coverage: ~{unitSystem === 'imperial' ? '868 mi²' : '2,249 km²'} grid (NYC + water bodies). Values are emission intensities ({unitSystem === 'imperial' ? 'tons CO₂/mi²/day' : 'tonnes CO₂/km²/day'}).
                 Aligned with NYC GHG inventory benchmarks.
               </p>
               <div className="stat-grid" style={{ gridTemplateColumns: intervention?.grid_impact?.affected_area_km2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)' }}>
