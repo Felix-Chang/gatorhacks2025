@@ -114,14 +114,6 @@ Try these prompts to see different spatial patterns:
 - **"green roof"** → Flat roof (commercial) focus
 - **"industrial"** → Airport and port concentration
 
-## 🔧 API Endpoints
-
-- `GET /` - Health check
-- `GET /api/baseline` - Baseline NYC emissions data
-- `POST /api/simulate` - Run sustainability simulation
-- `GET /api/openaq` - Raw OpenAQ station data
-- `GET /docs` - Interactive API documentation
-
 ## 🌟 Key Innovations
 
 1. **Deterministic Spatial Patterns**: Each prompt creates unique, reproducible patterns
@@ -147,10 +139,6 @@ Try these prompts to see different spatial patterns:
 ## 📄 License
 
 This project is part of GatorHacks 2025.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
 
 ---
 
