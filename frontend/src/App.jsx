@@ -136,13 +136,13 @@ const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, un
                 {view === 'difference' ? (
                   <>
                     <p>
-                      <strong>Reduction:</strong> <span className="highlight">{point.value.toFixed(1)}%</span>
+                      <strong>Emissions:</strong> <span className="highlight">{point.simulationValue ? formatEmissionIntensity(point.simulationValue, unitSystem) : '—'}</span>
                     </p>
                     <p>
+                      <strong>Reduction:</strong> {point.value.toFixed(1)}%
+                    </p>
+                    <p style={{ fontSize: '0.85em', opacity: 0.8 }}>
                       <strong>Before:</strong> {point.baselineValue ? formatEmissionIntensity(point.baselineValue, unitSystem) : '—'}
-                    </p>
-                    <p>
-                      <strong>After:</strong> {point.simulationValue ? formatEmissionIntensity(point.simulationValue, unitSystem) : '—'}
                     </p>
                   </>
                 ) : (
@@ -649,13 +649,22 @@ function App() {
 
   const stats = useMemo(() => computeStats(mapData), [mapData])
 
+  // For Grid Statistics display: use appropriate data based on view
+  const displayStats = useMemo(() => {
+    if (currentView === 'baseline') {
+      return computeStats(baseline)
+    } else if ((currentView === 'simulation' || currentView === 'difference') && simulation) {
+      return computeStats(simulation)
+    }
+    return stats
+  }, [currentView, baseline, simulation, stats])
+
   const getMarkerColor = useCallback((value, view) => {
     if (view === 'difference') {
-      if (value > 50) return '#10b981'
-      if (value > 25) return '#84cc16'
-      if (value > 10) return '#facc15'
-      if (value > 0) return '#f97316'
-      return '#ef4444'
+      if (value > 25) return '#10b981'  // High - Darker green
+      if (value > 10) return '#86efac'  // Medium - Light green
+      if (value > 0) return '#fde047'   // Low - Yellow
+      return '#fb923c'                  // No Significant Reduction - Orange
     }
 
     // Use ACTUAL emission values (tonnes CO₂/km²/day) to match legend
@@ -926,23 +935,19 @@ function App() {
                 <>
                   <div className="legend-item">
                     <div className="legend-color" style={{background: '#10b981'}}></div>
-                    <span>High Reduction (&gt;50%)</span>
+                    <span>High (&gt;25%)</span>
                   </div>
                   <div className="legend-item">
-                    <div className="legend-color" style={{background: '#84cc16'}}></div>
-                    <span>Medium-High (25-50%)</span>
-                  </div>
-                  <div className="legend-item">
-                    <div className="legend-color" style={{background: '#facc15'}}></div>
+                    <div className="legend-color" style={{background: '#86efac'}}></div>
                     <span>Medium (10-25%)</span>
                   </div>
                   <div className="legend-item">
-                    <div className="legend-color" style={{background: '#f97316'}}></div>
+                    <div className="legend-color" style={{background: '#fde047'}}></div>
                     <span>Low (0-10%)</span>
                   </div>
                   <div className="legend-item">
-                    <div className="legend-color" style={{background: '#ef4444'}}></div>
-                    <span>No Reduction</span>
+                    <div className="legend-color" style={{background: '#fb923c'}}></div>
+                    <span>No Significant Reduction</span>
                   </div>
                 </>
               ) : (
@@ -962,9 +967,9 @@ function App() {
       </div>
 
       {/* Statistics Grid */}
-      {(stats || statistics) && (
+      {(displayStats || statistics) && (
         <div className="stats-section fade-in">
-          {stats && (
+          {displayStats && (
             <div className="stat-card glass">
               <h3 className="stat-card-title">Grid Statistics</h3>
               <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '1rem', lineHeight: '1.4' }}>
@@ -979,7 +984,7 @@ function App() {
                       <span className="stat-sublabel"> (Baseline)</span>
                     )}
                   </span>
-                  <span className="stat-value">{formatEmissionIntensity((stats?.avgValue) || 0, unitSystem)}</span>
+                  <span className="stat-value">{formatEmissionIntensity((displayStats?.avgValue) || 0, unitSystem)}</span>
                   {intervention?.grid_impact && (
                     <>
                       <span className="stat-sublabel">After Intervention</span>
@@ -994,7 +999,7 @@ function App() {
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Data Points</span>
-                  <span className="stat-value">{stats?.dataPoints?.toLocaleString() || '0'}</span>
+                  <span className="stat-value">{displayStats?.dataPoints?.toLocaleString() || '0'}</span>
                 </div>
                 {intervention?.grid_impact?.affected_area_km2 && (
                   <div className="stat-item">
@@ -1021,13 +1026,13 @@ function App() {
               </div>
 
               {/* Average change percentage - calculated from actual grid data */}
-              {statistics && baselineAverage && stats && (
+              {statistics && baselineAverage && displayStats && (
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Average Emission Change</span>
                     {(() => {
                       // Calculate actual percentage change from grid averages
-                      const percentChange = ((baselineAverage - stats.avgValue) / baselineAverage) * 100
+                      const percentChange = ((baselineAverage - displayStats.avgValue) / baselineAverage) * 100
                       const isIncrease = percentChange < 0
                       return (
                         <span className={`stat-value ${isIncrease ? 'increase' : 'decrease'}`} style={{ fontSize: '1.5rem', fontWeight: '600' }}>
