@@ -102,9 +102,9 @@ Output with this exact structure:
 }
 
 IMPORTANT: Calculate grid_impact values based on:
-- baseline_avg_intensity: Current citywide average (tonnes CO2/km²/day) - use ~129.3 as baseline
-- baseline_median_intensity: Current citywide median (tonnes CO2/km²/day) - use ~92.3 as baseline
-- baseline_peak_intensity: Current peak hotspot (tonnes CO2/km²/day) - use ~3,000 for airports/dense areas
+- baseline_avg_intensity: Current citywide average (tonnes CO2/km²/day) - use ~64.7 as baseline
+- baseline_median_intensity: Current citywide median (tonnes CO2/km²/day) - use ~46.2 as baseline
+- baseline_peak_intensity: Current peak hotspot (tonnes CO2/km²/day) - use ~1,500 for airports/dense areas
 - Apply reduction_percent to affected areas (e.g., Manhattan = 59.5 km², Queens airports = 200 km²)
 - Citywide averages will change less than local hotspots (dilution effect across 2,249 km² total grid)"""
     

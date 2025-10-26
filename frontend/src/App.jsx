@@ -32,20 +32,13 @@ const computeStats = (data) => {
     return null
   }
 
-  const values = data.map((point) => point.value)
-  const sortedValues = [...values].sort((a, b) => a - b)
-  const minValue = sortedValues[0]
-  const maxValue = sortedValues[sortedValues.length - 1]
+  const values = data.map((point) => (point.value))
   const totalEmissions = values.reduce((sum, value) => sum + value, 0)
   const avgValue = totalEmissions / values.length
-  const medianValue = sortedValues[Math.floor(sortedValues.length / 2)]
 
   return {
-    minValue,
-    maxValue,
     avgValue,
     totalEmissions,
-    medianValue,
     dataPoints: values.length,
   }
 }
@@ -656,17 +649,17 @@ function App() {
 
     // Use ACTUAL emission values (tonnes CO₂/km²/day) to match legend
     // NYC inventory-aligned ranges:
-    // Peak Hotspots: >1,000 (airports, industrial)
-    // Very High: 200-1,000 (dense Manhattan)
-    // High: 80-200 (urban centers)
-    // Medium: 30-80 (typical urban)
-    // Low: <30 (parks, water, outer areas)
+    // Peak Hotspots: >500 (airports, industrial)
+    // Very High: 100-500 (dense Manhattan)
+    // High: 40-100 (urban centers)
+    // Medium: 15-40 (typical urban)
+    // Low: <15 (parks, water, outer areas)
 
-    if (value > 1000) return 'rgba(127, 29, 29, 0.9)'  // Peak Hotspots
-    if (value > 200) return 'rgba(239, 68, 68, 0.8)'   // Very High
-    if (value > 80) return 'rgba(251, 146, 60, 0.7)'   // High
-    if (value > 30) return 'rgba(250, 204, 21, 0.7)'   // Medium
-    return 'rgba(74, 222, 128, 0.6)'                   // Low
+    if (value > 500) return 'rgba(127, 29, 29, 0.9)'  // Peak Hotspots
+    if (value > 100) return 'rgba(239, 68, 68, 0.8)'  // Very High
+    if (value > 40) return 'rgba(251, 146, 60, 0.7)'  // High
+    if (value > 15) return 'rgba(250, 204, 21, 0.7)'  // Medium
+    return 'rgba(74, 222, 128, 0.6)'                  // Low
   }, [])
 
   const examplePrompts = [
@@ -1012,7 +1005,7 @@ function App() {
                 Coverage: ~2,249 km² grid (NYC + water bodies). Values are emission intensities (tonnes CO₂/km²/day).
                 Aligned with NYC GHG inventory benchmarks.
               </p>
-              <div className="stat-grid">
+              <div className="stat-grid" style={{ gridTemplateColumns: intervention?.grid_impact?.affected_area_km2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)' }}>
                 <div className="stat-item">
                   <span className="stat-label">
                     Average per {unitSystem === 'imperial' ? 'mi²' : 'km²'}
@@ -1020,7 +1013,7 @@ function App() {
                       <span className="stat-sublabel"> (Baseline)</span>
                     )}
                   </span>
-                  <span className="stat-value">{formatEmissionIntensity(stats?.avgValue || 0, unitSystem)}</span>
+                  <span className="stat-value">{formatEmissionIntensity((stats?.avgValue) || 0, unitSystem)}</span>
                   {intervention?.grid_impact && (
                     <>
                       <span className="stat-sublabel">After Intervention</span>
@@ -1032,50 +1025,6 @@ function App() {
                       </span>
                     </>
                   )}
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">
-                    Median Value
-                    {intervention?.grid_impact && (
-                      <span className="stat-sublabel"> (Baseline)</span>
-                    )}
-                  </span>
-                  <span className="stat-value">{formatEmissionIntensity(stats?.medianValue || 0, unitSystem)}</span>
-                  {intervention?.grid_impact && (
-                    <>
-                      <span className="stat-sublabel">After Intervention</span>
-                      <span className="stat-value-secondary">
-                        {formatEmissionIntensity(intervention.grid_impact.reduced_median_intensity || 0, unitSystem)}
-                        <span className={`stat-change ${intervention.grid_impact.median_change_percent < 0 ? 'increase' : 'decrease'}`}>
-                          {intervention.grid_impact.median_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.median_change_percent || 0).toFixed(1)}%
-                        </span>
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">
-                    Peak Emissions
-                    {intervention?.grid_impact && (
-                      <span className="stat-sublabel"> (Baseline)</span>
-                    )}
-                  </span>
-                  <span className="stat-value">{formatEmissionIntensity(stats?.maxValue || 0, unitSystem)}</span>
-                  {intervention?.grid_impact && (
-                    <>
-                      <span className="stat-sublabel">After Intervention</span>
-                      <span className="stat-value-secondary">
-                        {formatEmissionIntensity(intervention.grid_impact.reduced_peak_intensity || 0, unitSystem)}
-                        <span className={`stat-change ${intervention.grid_impact.peak_change_percent < 0 ? 'increase' : 'decrease'}`}>
-                          {intervention.grid_impact.peak_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.peak_change_percent || 0).toFixed(1)}%
-                        </span>
-                      </span>
-                    </>
-                  )}
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Minimum Emissions</span>
-                  <span className="stat-value">{formatEmissionIntensity(stats?.minValue || 0, unitSystem)}</span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Data Points</span>

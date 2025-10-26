@@ -145,14 +145,14 @@ class NYCEmissionsData:
         print(f"[GRID] Cell area: {cell_area_km2:.4f} km² ({self.grid_resolution}x{self.grid_resolution} = {self.grid_resolution**2} cells)")
         
         # RESCALED TO MATCH NYC INVENTORY BENCHMARKS
-        # Target: 150,000-200,000 tonnes/day citywide (mid-range of 100k-300k)
-        # Average per km²: 150-250 tonnes/km²/day
+        # Target: 75,000-100,000 tonnes/day citywide (mid-range of 50k-150k)
+        # Average per km²: 75-125 tonnes/km²/day
         
-        # 1. AIRPORTS - Peak hotspots (1,000-5,000 tonnes/km²/day at center)
+        # 1. AIRPORTS - Peak hotspots (500-2,500 tonnes/km²/day at center)
         print("[REAL-DATA] Adding airport emissions hotspots...")
         airports = [
-            {'name': 'JFK', 'lat': 40.6413, 'lon': -73.7781, 'peak_density_tonne_km2_day': 3000},  # 3,000 metric tonnes/km²/day peak
-            {'name': 'LaGuardia', 'lat': 40.7769, 'lon': -73.8740, 'peak_density_tonne_km2_day': 2000}  # 2,000 metric tonnes/km²/day peak
+            {'name': 'JFK', 'lat': 40.6413, 'lon': -73.7781, 'peak_density_tonne_km2_day': 1500},  # 1,500 metric tonnes/km²/day peak
+            {'name': 'LaGuardia', 'lat': 40.7769, 'lon': -73.8740, 'peak_density_tonne_km2_day': 1000}  # 1,000 metric tonnes/km²/day peak
         ]
         
         for airport in airports:
@@ -174,12 +174,12 @@ class NYCEmissionsData:
                                 intensity = np.exp(-distance**2 / (2 * (radius_cells/3.0)**2))
                                 emissions_grid[ni, nj] += peak_density * intensity
         
-        # 2. MANHATTAN HOTSPOTS - High-density commercial (200-300 tonnes/km²/day)
+        # 2. MANHATTAN HOTSPOTS - High-density commercial (100-150 tonnes/km²/day)
         print("[REAL-DATA] Adding Manhattan urban hotspots...")
         hotspots = [
-            {'name': 'Midtown/Times Square', 'lat': 40.758, 'lon': -73.9855, 'emissions_tonne_km2_day': 280, 'radius': 3},
-            {'name': 'Financial District', 'lat': 40.7074, 'lon': -74.0113, 'emissions_tonne_km2_day': 250, 'radius': 2},
-            {'name': 'Upper West Side', 'lat': 40.7870, 'lon': -73.9754, 'emissions_tonne_km2_day': 220, 'radius': 2},
+            {'name': 'Midtown/Times Square', 'lat': 40.758, 'lon': -73.9855, 'emissions_tonne_km2_day': 140, 'radius': 3},
+            {'name': 'Financial District', 'lat': 40.7074, 'lon': -74.0113, 'emissions_tonne_km2_day': 125, 'radius': 2},
+            {'name': 'Upper West Side', 'lat': 40.7870, 'lon': -73.9754, 'emissions_tonne_km2_day': 110, 'radius': 2},
         ]
         
         for hotspot in hotspots:
@@ -207,16 +207,16 @@ class NYCEmissionsData:
                     base_emission = self._calculate_baseline_urban_emission(lat, lon)
                     emissions_grid[i, j] = max(emissions_grid[i, j], base_emission)
         
-        # 4. WATER/PARKS - Minimum emissions (5-30 tonnes/km²/day)
+        # 4. WATER/PARKS - Minimum emissions (2.5-15 tonnes/km²/day)
         print("[REAL-DATA] Applying water/park modifiers...")
         for i, lat in enumerate(lats):
             for j, lon in enumerate(lons):
                 if self._is_over_water(lat, lon):
-                    # Water bodies: minimum 10 tonnes/km²/day (shipping, ferries not fully modeled)
-                    emissions_grid[i, j] = max(10, emissions_grid[i, j] * 0.05)
+                    # Water bodies: minimum 5 tonnes/km²/day (shipping, ferries not fully modeled)
+                    emissions_grid[i, j] = max(5, emissions_grid[i, j] * 0.05)
 
         # Ensure minimum emissions (parks, low-activity areas)
-        emissions_grid = np.maximum(emissions_grid, 8)  # 8 tonnes/km²/day minimum
+        emissions_grid = np.maximum(emissions_grid, 4)  # 4 tonnes/km²/day minimum
         
         # Calculate and report citywide total for verification
         total_emissions_tonnes_day = np.sum(emissions_grid * cell_area_km2)
@@ -261,7 +261,38 @@ class NYCEmissionsData:
     def _calculate_baseline_urban_emission(self, lat: float, lon: float) -> float:
         """
         Calculate baseline urban emission intensity based on borough proximity
-        Target: Average 80-150 tonnes/km²/day for typical urban areas (adjusted for citywide total)
+        Target: Average 40-75 tonnes/km²/day for typical urban areas (adjusted for citywide total)
+        """
+        base_emission = 25  # Base urban emission (25 tonnes CO₂/km²/day)
+
+        # Calculate distance to each borough center and apply intensity
+        total_intensity = 0
+        for borough, data in self.BOROUGHS.items():
+            center_lat, center_lon = data['center']
+            intensity = data['intensity']
+
+            # Euclidean distance (simplified, not geodesic)
+            distance = np.sqrt((lat - center_lat)**2 + (lon - center_lon)**2)
+
+            # Inverse distance weighting with falloff
+            if distance < 0.05:
+                # Very close to borough center: high emissions
+                contribution = intensity * 40
+            elif distance < 0.15:
+                # Near borough center
+                contribution = intensity * 25 / (distance * 10 + 1)
+            else:
+                # Outer areas
+                contribution = intensity * 15 / (distance * 20 + 1)
+
+            total_intensity += contribution
+
+        return base_emission + total_intensity
+    
+    def _calculate_emission_at_point(self, lat: float, lon: float) -> float:
+        """
+        Calculate emission value at a specific point based on NYC geography
+        FALLBACK method for synthetic baseline only
         """
         base_emission = 50  # Base urban emission (50 tonnes CO₂/km²/day)
 
@@ -276,50 +307,19 @@ class NYCEmissionsData:
 
             # Inverse distance weighting with falloff
             if distance < 0.05:
-                # Very close to borough center: high emissions
-                contribution = intensity * 80
+                contribution = intensity * 75
             elif distance < 0.15:
-                # Near borough center
                 contribution = intensity * 50 / (distance * 10 + 1)
             else:
-                # Outer areas
-                contribution = intensity * 30 / (distance * 20 + 1)
-
-            total_intensity += contribution
-
-        return base_emission + total_intensity
-    
-    def _calculate_emission_at_point(self, lat: float, lon: float) -> float:
-        """
-        Calculate emission value at a specific point based on NYC geography
-        FALLBACK method for synthetic baseline only
-        """
-        base_emission = 100  # Base urban emission (100 tonnes CO₂/km²/day)
-
-        # Calculate distance to each borough center and apply intensity
-        total_intensity = 0
-        for borough, data in self.BOROUGHS.items():
-            center_lat, center_lon = data['center']
-            intensity = data['intensity']
-
-            # Euclidean distance (simplified, not geodesic)
-            distance = np.sqrt((lat - center_lat)**2 + (lon - center_lon)**2)
-
-            # Inverse distance weighting with falloff
-            if distance < 0.05:
-                contribution = intensity * 150
-            elif distance < 0.15:
-                contribution = intensity * 100 / (distance * 10 + 1)
-            else:
-                contribution = intensity * 50 / (distance * 20 + 1)
+                contribution = intensity * 25 / (distance * 20 + 1)
 
             total_intensity += contribution
 
         # Add hotspots (airports, industrial areas) - rescaled
         hotspots = [
-            (40.6413, -73.7781, 2000),  # JFK Airport
-            (40.7769, -73.8740, 1500),  # LaGuardia Airport
-            (40.7580, -73.9855, 250),   # Times Square / Midtown
+            (40.6413, -73.7781, 1000),  # JFK Airport
+            (40.7769, -73.8740, 750),   # LaGuardia Airport
+            (40.7580, -73.9855, 125),   # Times Square / Midtown
         ]
 
         for spot_lat, spot_lon, spot_intensity in hotspots:
@@ -330,7 +330,7 @@ class NYCEmissionsData:
         # Lower emissions over water
         if self._is_over_water(lat, lon):
             total_intensity *= 0.1
-            base_emission = 10  # Water minimum
+            base_emission = 5  # Water minimum
 
         return base_emission + total_intensity
     
