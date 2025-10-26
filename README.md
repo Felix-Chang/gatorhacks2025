@@ -43,17 +43,6 @@ git clone https://github.com/Felix-Chang/gatorhacks2025.git
 - Modern web browser
 
 ### Backend Setup
-
-Before running the backend, create a `.env` file in the `backend` folder to store your API keys and configuration.  
-
-1. Inside the `backend` directory, create a new file called `.env`  
-2. Add your API keys and variables in the following format:
-
-OPENAQ_API_KEY=your_api_key_here
-
-3. Save the file. These variables will be automatically loaded when the backend starts.  
-4. **Do not commit** `.env` files to GitHub. They contain sensitive keys.  
-
 **Windows**
 ```
 cd backend
@@ -125,26 +114,6 @@ Try these prompts to see different spatial patterns:
 - **"green roof"** → Flat roof (commercial) focus
 - **"industrial"** → Airport and port concentration
 
-## 📁 Project Structure
-
-```
-nyc-co2-app/
-├── backend/
-│   ├── main.py              # FastAPI server
-│   ├── ai_processor.py      # AI prompt parsing
-│   ├── data_processor.py    # Spatial modeling & data processing
-│   └── requirements.txt     # Python dependencies
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx         # React frontend
-│   │   └── main.jsx       # React entry point
-│   ├── package.json       # Node.js dependencies
-│   └── vite.config.js     # Vite configuration
-├── test-app.html          # Standalone HTML version
-├── start-backend.bat      # Backend startup script
-└── start-frontend.bat     # Frontend startup script
-```
-
 ## 🔧 API Endpoints
 
 - `GET /` - Health check
@@ -182,8 +151,6 @@ This project is part of GatorHacks 2025.
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit issues and pull requests.
-
----
 
 ---
 

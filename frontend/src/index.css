@@ -746,6 +746,10 @@ body::after {
     color: var(--success);
 }
 
+.stat-value-featured.increase {
+    color: #ef4444;
+}
+
 .stat-unit {
     font-size: 1rem;
     font-weight: 400;
