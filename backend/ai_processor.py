@@ -837,6 +837,14 @@ Be specific about NYC landmarks, neighborhoods, and geographic features."""
 
         reduction_percent = percent if intervention["direction"] == "decrease" else -percent
         intervention["reduction_percent"] = reduction_percent
+        
+        # Generate geographic_modifications based on percentage
+        # Scale the change_percent based on the percentage in the prompt
+        geographic_modifications = self._generate_geographic_modifications(
+            borough, scenario["sector"], scenario.get("subsector"), percent, reduction_percent, scenario["direction"]
+        )
+        intervention["geographic_modifications"] = geographic_modifications
+        
         spatial_pattern = self._generate_spatial_pattern_from_ai({
             "borough": borough,
             "sector": intervention["sector"],
@@ -858,6 +866,53 @@ Be specific about NYC landmarks, neighborhoods, and geographic features."""
         action = verbs.get(direction, 'change')
         target = targets[0] if targets else sector
         return f"{percent:.0f}% {target} {action} in {location}"
+
+    def _generate_geographic_modifications(self, borough: str, sector: str, subsector: str, percent: float, reduction_percent: float, direction: str) -> List[Dict]:
+        """
+        Generate geographic modifications based on borough, sector, and percentage
+        This scales the change_percent values based on the percentage in the user's prompt
+        """
+        modifications = []
+        
+        # Scale factor: 10% should give smaller change_percent than 30%
+        # For taxis: 10% → -4%, 30% → -12% (roughly 3x difference)
+        # We'll use the percentage directly as a scaling factor
+        base_change_percent = abs(reduction_percent) * 0.2  # Base multiplier
+        
+        # If borough is not citywide, apply changes to that borough
+        if borough != "citywide":
+            # Scale the change based on percentage
+            borough_change = -base_change_percent if direction == "decrease" else base_change_percent
+            modifications.append({
+                "area": borough,
+                "change_percent": borough_change,
+                "type": "borough"
+            })
+        
+        # For sectors that might affect other areas
+        if sector == "transport":
+            # Transport affects all boroughs but with different intensities
+            if borough != "citywide":
+                # Add smaller impact to other boroughs (half the borough's impact)
+                other_boroughs = [b for b in self.BOROUGHS if b != borough]
+                for other_borough in other_boroughs[:2]:  # Limit to 2 other boroughs for simplicity
+                    other_change = -base_change_percent * 0.3 if direction == "decrease" else base_change_percent * 0.3
+                    modifications.append({
+                        "area": other_borough,
+                        "change_percent": other_change,
+                        "type": "borough"
+                    })
+        
+        # Add a small citywide baseline adjustment if it's a significant intervention
+        if abs(reduction_percent) > 20:
+            baseline_change = -base_change_percent * 0.1 if direction == "decrease" else base_change_percent * 0.1
+            modifications.append({
+                "area": "citywide_baseline",
+                "change_percent": baseline_change,
+                "type": "baseline"
+            })
+        
+        return modifications
 
     def _extract_borough(self, prompt_lower: str) -> str:
         # Check for specific airport mentions first
