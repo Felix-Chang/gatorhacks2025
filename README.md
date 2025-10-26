@@ -1,4 +1,4 @@
-# CarbonIQ<img src="carboniq-logo.png" alt="CarbonIQ Logo" width="40" align="left"/>
+# CarbonIQ<img src="carboniq-logo.png" alt="CarbonIQ Logo" width="40" align="right"/>
 
 
 **An AI-powered climate impact simulator**
