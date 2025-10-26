@@ -504,14 +504,22 @@ function App() {
       setIntervention(interventionData)
       setStatistics(statisticsData)
       setCurrentView('simulation')
-      
-      // Debug: Log statistics to console
+
+      // Debug: Log both intervention and statistics to console
+      console.log('[CARBONIQ] Intervention received:', {
+        reduction_percent: interventionData?.reduction_percent,
+        magnitude_percent: interventionData?.magnitude_percent,
+        direction: interventionData?.direction,
+        description: interventionData?.description,
+        confidence_level: interventionData?.confidence_level
+      })
       console.log('[CARBONIQ] Statistics received:', {
         is_increase: statisticsData?.is_increase,
         is_unrelated: statisticsData?.is_unrelated,
         direction: statisticsData?.direction,
         percentage_reduction: statisticsData?.percentage_reduction,
-        annual_savings_tons_co2: statisticsData?.annual_savings_tons_co2
+        annual_savings_tons_co2: statisticsData?.annual_savings_tons_co2,
+        baseline_tons_co2: statisticsData?.baseline_tons_co2
       })
       
       // Ensure statistics has required fields
@@ -646,19 +654,19 @@ function App() {
       return '#ef4444'
     }
 
-    // Use ACTUAL emission values (kg CO₂/km²/day) to match legend
+    // Use ACTUAL emission values (tonnes CO₂/km²/day) to match legend
     // NYC inventory-aligned ranges:
-    // Peak Hotspots: >1,000,000 (airports, industrial)
-    // Very High: 200,000-1,000,000 (dense Manhattan)
-    // High: 80,000-200,000 (urban centers)
-    // Medium: 30,000-80,000 (typical urban)
-    // Low: <30,000 (parks, water, outer areas)
-    
-    if (value > 1000000) return 'rgba(127, 29, 29, 0.9)'  // Peak Hotspots
-    if (value > 200000) return 'rgba(239, 68, 68, 0.8)'   // Very High
-    if (value > 80000) return 'rgba(251, 146, 60, 0.7)'   // High
-    if (value > 30000) return 'rgba(250, 204, 21, 0.7)'   // Medium
-    return 'rgba(74, 222, 128, 0.6)'                      // Low
+    // Peak Hotspots: >1,000 (airports, industrial)
+    // Very High: 200-1,000 (dense Manhattan)
+    // High: 80-200 (urban centers)
+    // Medium: 30-80 (typical urban)
+    // Low: <30 (parks, water, outer areas)
+
+    if (value > 1000) return 'rgba(127, 29, 29, 0.9)'  // Peak Hotspots
+    if (value > 200) return 'rgba(239, 68, 68, 0.8)'   // Very High
+    if (value > 80) return 'rgba(251, 146, 60, 0.7)'   // High
+    if (value > 30) return 'rgba(250, 204, 21, 0.7)'   // Medium
+    return 'rgba(74, 222, 128, 0.6)'                   // Low
   }, [])
 
   const examplePrompts = [
@@ -952,16 +960,25 @@ function App() {
         <div className="stats-section fade-in">
           {statistics && (
             <div className="stat-card glass featured-stat">
-              <h3 className="stat-card-title">Sector-Specific Emissions Impact</h3>
+              <h3 className="stat-card-title">
+                Emissions Impact Analysis
+                {statistics?.confidence && (
+                  <span className={`confidence-badge ${statistics.confidence}`}>
+                    {statistics.confidence} confidence
+                  </span>
+                )}
+              </h3>
               <div className="stat-row-featured">
                 <div className="stat-col">
-                  <span className="stat-label-featured">Sector Baseline</span>
+                  <span className="stat-label-featured">Current Emissions</span>
                   <span className="stat-value-featured">{formatAnnualEmissions(statistics?.baseline_tons_co2 || 0, unitSystem, false)} / year</span>
+                  <span className="stat-sublabel">Baseline for this sector</span>
                 </div>
                 <div className="stat-divider">→</div>
                 <div className="stat-col">
-                  <span className="stat-label-featured">After Intervention</span>
+                  <span className="stat-label-featured">With Intervention</span>
                   <span className={`stat-value-featured ${statistics?.is_increase ? 'increase' : 'success'}`}>{formatAnnualEmissions(statistics?.reduced_tons_co2 || 0, unitSystem, false)} / year</span>
+                  <span className="stat-sublabel">After implementation</span>
                 </div>
               </div>
               <div className="stat-savings">
@@ -974,13 +991,13 @@ function App() {
                 ) : statistics ? (
                   <>
                     <span className="savings-label">
-                      {statistics?.is_increase ? 'Annual Impact (Increased)' : 'Annual Savings'}
+                      {statistics?.is_increase ? 'Net Emissions Increase' : 'Net Emissions Reduction'}
                     </span>
                     <span className={`savings-value ${statistics?.is_increase ? 'increase' : 'decrease'}`}>
-                      {statistics?.is_increase ? '+' : ''}{formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, false)} CO₂ / year
+                      {statistics?.is_increase ? '+' : '−'}{formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, false)} CO₂ / year
                     </span>
                     <span className={`savings-percent ${statistics?.is_increase ? 'increase' : 'decrease'}`}>
-                      ({statistics?.is_increase ? '+' : ''}{statistics?.percentage_reduction || 0}% {statistics?.is_increase ? 'increase' : 'reduction'} in this sector)
+                      ({statistics?.is_increase ? '+' : '−'}{Math.abs(statistics?.percentage_reduction || 0).toFixed(1)}% change in sector emissions)
                     </span>
                   </>
                 ) : null}
@@ -992,21 +1009,69 @@ function App() {
             <div className="stat-card glass">
               <h3 className="stat-card-title">Grid Statistics</h3>
               <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '1rem', lineHeight: '1.4' }}>
-                Coverage: ~2,249 km² grid (NYC + water bodies). Values are emission intensities (kg CO₂/km²/day). 
+                Coverage: ~2,249 km² grid (NYC + water bodies). Values are emission intensities (tonnes CO₂/km²/day).
                 Aligned with NYC GHG inventory benchmarks.
               </p>
               <div className="stat-grid">
                 <div className="stat-item">
-                  <span className="stat-label">Average per {unitSystem === 'imperial' ? 'mi²' : 'km²'}</span>
+                  <span className="stat-label">
+                    Average per {unitSystem === 'imperial' ? 'mi²' : 'km²'}
+                    {intervention?.grid_impact && (
+                      <span className="stat-sublabel"> (Baseline)</span>
+                    )}
+                  </span>
                   <span className="stat-value">{formatEmissionIntensity(stats?.avgValue || 0, unitSystem)}</span>
+                  {intervention?.grid_impact && (
+                    <>
+                      <span className="stat-sublabel">After Intervention</span>
+                      <span className="stat-value-secondary">
+                        {formatEmissionIntensity(intervention.grid_impact.reduced_avg_intensity || 0, unitSystem)}
+                        <span className={`stat-change ${intervention.grid_impact.avg_change_percent < 0 ? 'increase' : 'decrease'}`}>
+                          {intervention.grid_impact.avg_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.avg_change_percent || 0).toFixed(1)}%
+                        </span>
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label">Median Value</span>
+                  <span className="stat-label">
+                    Median Value
+                    {intervention?.grid_impact && (
+                      <span className="stat-sublabel"> (Baseline)</span>
+                    )}
+                  </span>
                   <span className="stat-value">{formatEmissionIntensity(stats?.medianValue || 0, unitSystem)}</span>
+                  {intervention?.grid_impact && (
+                    <>
+                      <span className="stat-sublabel">After Intervention</span>
+                      <span className="stat-value-secondary">
+                        {formatEmissionIntensity(intervention.grid_impact.reduced_median_intensity || 0, unitSystem)}
+                        <span className={`stat-change ${intervention.grid_impact.median_change_percent < 0 ? 'increase' : 'decrease'}`}>
+                          {intervention.grid_impact.median_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.median_change_percent || 0).toFixed(1)}%
+                        </span>
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label">Peak Emissions</span>
+                  <span className="stat-label">
+                    Peak Emissions
+                    {intervention?.grid_impact && (
+                      <span className="stat-sublabel"> (Baseline)</span>
+                    )}
+                  </span>
                   <span className="stat-value">{formatEmissionIntensity(stats?.maxValue || 0, unitSystem)}</span>
+                  {intervention?.grid_impact && (
+                    <>
+                      <span className="stat-sublabel">After Intervention</span>
+                      <span className="stat-value-secondary">
+                        {formatEmissionIntensity(intervention.grid_impact.reduced_peak_intensity || 0, unitSystem)}
+                        <span className={`stat-change ${intervention.grid_impact.peak_change_percent < 0 ? 'increase' : 'decrease'}`}>
+                          {intervention.grid_impact.peak_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.peak_change_percent || 0).toFixed(1)}%
+                        </span>
+                      </span>
+                    </>
+                  )}
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">Minimum Emissions</span>
@@ -1016,7 +1081,18 @@ function App() {
                   <span className="stat-label">Data Points</span>
                   <span className="stat-value">{stats?.dataPoints?.toLocaleString() || '0'}</span>
                 </div>
+                {intervention?.grid_impact?.affected_area_km2 && (
+                  <div className="stat-item">
+                    <span className="stat-label">Affected Area</span>
+                    <span className="stat-value">{intervention.grid_impact.affected_area_km2.toFixed(1)} km²</span>
+                  </div>
+                )}
               </div>
+              {intervention?.grid_impact?.notes && (
+                <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.75rem', fontStyle: 'italic' }}>
+                  {intervention.grid_impact.notes}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -1025,25 +1101,111 @@ function App() {
       {/* Intervention Details */}
       {intervention && (
         <div className="intervention-details glass fade-in">
-          <h3 className="details-title">Intervention Analysis</h3>
+          <h3 className="details-title">
+            Intervention Analysis
+            {intervention.confidence_level && (
+              <span className={`confidence-badge ${intervention.confidence_level}`}>
+                {intervention.confidence_level} confidence
+              </span>
+            )}
+          </h3>
+
+          {/* User's Intervention Request */}
+          <div className="intervention-summary">
+            <div className="summary-text">
+              <strong>Scenario:</strong> {intervention.description}
+            </div>
+          </div>
+
+          {/* Claude's Analysis Results */}
           <div className="details-grid">
             <div className="detail-item">
-              <span className="detail-label">Target Sector</span>
+              <span className="detail-label">Affected Sector</span>
               <span className="detail-value">{intervention.sector}</span>
             </div>
+            {intervention.subsector && (
+              <div className="detail-item">
+                <span className="detail-label">Specific Target</span>
+                <span className="detail-value">{intervention.subsector}</span>
+              </div>
+            )}
             <div className="detail-item">
-              <span className="detail-label">Location</span>
+              <span className="detail-label">Geographic Area</span>
               <span className="detail-value">{intervention.borough || 'Citywide'}</span>
             </div>
             <div className="detail-item">
-              <span className="detail-label">Reduction Target</span>
-              <span className="detail-value">{intervention.reduction_percent || intervention.magnitude_percent}%</span>
+              <span className="detail-label">Calculated Impact</span>
+              <span className={`detail-value ${statistics?.is_increase ? 'not-feasible' : 'feasible'}`}>
+                {statistics?.is_increase ? '+' : '−'}{Math.abs(statistics?.percentage_reduction || intervention.reduction_percent || intervention.magnitude_percent || 0).toFixed(1)}% emissions
+              </span>
             </div>
             <div className="detail-item full-width">
-              <span className="detail-label">Description</span>
-              <span className="detail-value">{intervention.description}</span>
+              <span className="detail-label">What This Means</span>
+              <span className="detail-value detail-text">
+                {statistics?.is_increase
+                  ? `This intervention would increase emissions in the ${intervention.sector} sector by ${Math.abs(statistics?.percentage_reduction || 0).toFixed(1)}% annually.`
+                  : `This intervention would reduce ${intervention.sector} sector emissions by ${Math.abs(statistics?.percentage_reduction || intervention.reduction_percent || 0).toFixed(1)}% per year.`
+                }
+              </span>
             </div>
           </div>
+
+          {/* Feasibility & Timeline */}
+          {(intervention.is_feasible !== undefined || intervention.implementation_timeline) && (
+            <div className="details-section">
+              <h4 className="section-subtitle">Feasibility Assessment</h4>
+              <div className="details-grid">
+                {intervention.is_feasible !== undefined && (
+                  <div className="detail-item">
+                    <span className="detail-label">Feasibility</span>
+                    <span className={`detail-value ${intervention.is_feasible ? 'feasible' : 'not-feasible'}`}>
+                      {intervention.is_feasible ? '✓ Feasible' : '⚠ Low Feasibility'}
+                    </span>
+                  </div>
+                )}
+                {intervention.implementation_timeline && (
+                  <div className="detail-item">
+                    <span className="detail-label">Timeline</span>
+                    <span className="detail-value">{intervention.implementation_timeline}</span>
+                  </div>
+                )}
+                {intervention.cost_estimate && (
+                  <div className="detail-item">
+                    <span className="detail-label">Cost Estimate</span>
+                    <span className="detail-value">{intervention.cost_estimate}</span>
+                  </div>
+                )}
+                {intervention.feasibility_notes && (
+                  <div className="detail-item full-width">
+                    <span className="detail-label">Notes</span>
+                    <span className="detail-value detail-text">{intervention.feasibility_notes}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Secondary Effects */}
+          {intervention.secondary_effects && intervention.secondary_effects.length > 0 && (
+            <div className="details-section">
+              <h4 className="section-subtitle">Secondary Impacts</h4>
+              <ul className="secondary-effects-list">
+                {intervention.secondary_effects.map((effect, i) => (
+                  <li key={i} className="secondary-effect-item">{effect}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* AI Reasoning (Expandable) */}
+          {intervention.reasoning && (
+            <details className="ai-reasoning">
+              <summary>View AI Analysis & Calculations</summary>
+              <div className="reasoning-content">
+                <p>{intervention.reasoning}</p>
+              </div>
+            </details>
+          )}
         </div>
       )}
 

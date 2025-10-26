@@ -19,21 +19,21 @@ export const CONVERSIONS = {
   M2_TO_FT2: 10.7639104,
   
   // Combined (for emission intensity)
-  // kg CO₂/km²/day → lbs CO₂/mi²/day
-  // = (kg → lbs) × (km² → mi²)
-  // = 2.20462 × 0.386102 = 0.851315
-  KG_PER_KM2_TO_LBS_PER_MI2: 0.851315294,
+  // tonnes CO₂/km²/day → tons CO₂/mi²/day
+  // = (metric ton → short ton) / (km² → mi²)
+  // = 1.10231 / 0.386102 = 2.85449
+  TONNES_PER_KM2_TO_TONS_PER_MI2: 2.85449,
 };
 
 /**
  * Convert emission intensity between metric and imperial
- * @param {number} value - Emission value in kg CO₂/km²/day
+ * @param {number} value - Emission value in tonnes CO₂/km²/day
  * @param {string} toUnit - 'metric' or 'imperial'
  * @returns {number} Converted value
  */
 export function convertEmissionIntensity(value, toUnit) {
   if (toUnit === 'imperial') {
-    return value * CONVERSIONS.KG_PER_KM2_TO_LBS_PER_MI2;
+    return value * CONVERSIONS.TONNES_PER_KM2_TO_TONS_PER_MI2;
   }
   return value; // Already metric
 }
@@ -53,17 +53,17 @@ export function convertAnnualEmissions(tons, toUnit) {
 
 /**
  * Format emission intensity with proper units
- * @param {number} value - Raw value in kg CO₂/km²/day (metric)
+ * @param {number} value - Raw value in tonnes CO₂/km²/day (metric)
  * @param {string} unit - 'metric' or 'imperial'
  * @returns {string} Formatted string with units
  */
 export function formatEmissionIntensity(value, unit = 'metric') {
   const converted = convertEmissionIntensity(value, unit);
-  
+
   if (unit === 'imperial') {
-    return `${converted.toFixed(1)} lbs CO₂/mi²/day`;
+    return `${converted.toFixed(1)} tons CO₂/mi²/day`;
   }
-  return `${converted.toFixed(1)} kg CO₂/km²/day`;
+  return `${converted.toFixed(1)} tonnes CO₂/km²/day`;
 }
 
 /**
@@ -94,14 +94,14 @@ export function formatAnnualEmissions(tons, unit = 'metric', abbreviated = true)
  * @returns {Array} Array of range objects with labels and colors
  */
 export function getLegendRanges(unit = 'metric') {
-  // NYC inventory-aligned ranges (kg CO₂/km²/day)
-  // Peak hotspots: 1M-5M | High urban: 200k-300k | Median: 40k-120k | Min: 5k-30k
+  // NYC inventory-aligned ranges (tonnes CO₂/km²/day)
+  // Peak hotspots: 1k-5k | High urban: 200-300 | Median: 40-120 | Min: 5-30
   const metricRanges = [
-    { min: 1000000, max: Infinity, label: 'Peak Hotspots', color: 'rgba(127, 29, 29, 0.9)' },
-    { min: 200000, max: 1000000, label: 'Very High', color: 'rgba(239, 68, 68, 0.8)' },
-    { min: 80000, max: 200000, label: 'High', color: 'rgba(251, 146, 60, 0.7)' },
-    { min: 30000, max: 80000, label: 'Medium', color: 'rgba(250, 204, 21, 0.7)' },
-    { min: 0, max: 30000, label: 'Low', color: 'rgba(74, 222, 128, 0.6)' },
+    { min: 1000, max: Infinity, label: 'Peak Hotspots', color: 'rgba(127, 29, 29, 0.9)' },
+    { min: 200, max: 1000, label: 'Very High', color: 'rgba(239, 68, 68, 0.8)' },
+    { min: 80, max: 200, label: 'High', color: 'rgba(251, 146, 60, 0.7)' },
+    { min: 30, max: 80, label: 'Medium', color: 'rgba(250, 204, 21, 0.7)' },
+    { min: 0, max: 30, label: 'Low', color: 'rgba(74, 222, 128, 0.6)' },
   ];
   
   if (unit === 'imperial') {
@@ -132,7 +132,7 @@ export function formatLegendRange(min, max, unit = 'metric') {
 
 /**
  * Get map marker color based on value and unit
- * @param {number} value - Emission value in kg CO₂/km²/day (metric)
+ * @param {number} value - Emission value in tonnes CO₂/km²/day (metric)
  * @param {string} view - 'baseline' or 'difference'
  * @param {string} unit - 'metric' or 'imperial' (only used for debugging)
  * @returns {string} Color hex/rgba
@@ -146,14 +146,14 @@ export function getMarkerColor(value, view, unit = 'metric') {
     if (value > 0) return '#f97316';
     return '#ef4444';
   }
-  
+
   // Emission intensity colors (NYC inventory-aligned)
-  // Always use metric thresholds internally (kg CO₂/km²/day)
-  if (value > 1000000) return 'rgba(127, 29, 29, 0.9)';  // Peak Hotspots (airports)
-  if (value > 200000) return 'rgba(239, 68, 68, 0.8)';   // Very High (dense Manhattan)
-  if (value > 80000) return 'rgba(251, 146, 60, 0.7)';   // High (urban centers)
-  if (value > 30000) return 'rgba(250, 204, 21, 0.7)';   // Medium (typical urban)
-  return 'rgba(74, 222, 128, 0.6)';                      // Low (parks, water, outer areas)
+  // Always use metric thresholds internally (tonnes CO₂/km²/day)
+  if (value > 1000) return 'rgba(127, 29, 29, 0.9)';  // Peak Hotspots (airports)
+  if (value > 200) return 'rgba(239, 68, 68, 0.8)';   // Very High (dense Manhattan)
+  if (value > 80) return 'rgba(251, 146, 60, 0.7)';   // High (urban centers)
+  if (value > 30) return 'rgba(250, 204, 21, 0.7)';   // Medium (typical urban)
+  return 'rgba(74, 222, 128, 0.6)';                   // Low (parks, water, outer areas)
 }
 
 /**
@@ -165,15 +165,15 @@ export function getMarkerColor(value, view, unit = 'metric') {
 export function getUnitLabel(type, unit = 'metric') {
   const labels = {
     emission_intensity: {
-      metric: 'kg CO₂/km²/day',
-      imperial: 'lbs CO₂/mi²/day',
+      metric: 'tonnes CO₂/km²/day',
+      imperial: 'tons CO₂/mi²/day',
     },
     annual_emissions: {
       metric: 'tonnes CO₂/year',
       imperial: 'tons CO₂/year',
     },
   };
-  
+
   return labels[type]?.[unit] || '';
 }
 

@@ -1,6 +1,6 @@
 ﻿"""
 AI Prompt Processing Module
-Uses OpenAI API to analyze prompts and generate realistic spatial predictions
+Uses Claude API (Anthropic) to analyze prompts and generate realistic spatial predictions
 based on actual NYC data and geographic intelligence
 """
 
@@ -9,16 +9,104 @@ import json
 import re
 import numpy as np
 import requests
+import os
 
 
 class AIPromptProcessor:
     """
     Advanced AI processor that analyzes prompts and generates realistic spatial predictions
-    Uses OpenAI API to understand context, geography, and create unique patterns
+    Uses Claude API (Anthropic) to understand context, geography, and create unique patterns
     """
-    
+
     BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island']
     SECTORS = ['transport', 'buildings', 'industry', 'energy', 'nature']
+
+    # Claude System Prompt - Data-Aware NYC Emissions Analysis
+    CLAUDE_SYSTEM_PROMPT = """You are an expert climate analyst specializing in NYC emissions modeling. You have access to real NYC data:
+
+DATA CONTEXT:
+- Buildings: 64,169 tracked (LL84 Local Law 84 energy data)
+- Vehicles: 2,100,000 total (1,600,000 gasoline, 300,000 diesel, 150,000 hybrid, 40,000 EV)
+- Taxis: 13,500 yellow cabs + 80,000 for-hire vehicles (avg 180 mi/day each)
+- Buses: 5,800 MTA buses (avg 150 mi/day each)
+- Trees: 683,788 street trees (avg 21 kg CO2/year sequestration each)
+- Airports: JFK (450,000 ops/year at 40.6413°N, 73.7781°W), LaGuardia (365,000 ops/year at 40.7769°N, 73.8740°W)
+- Power Grid: 13,500 MW capacity, average 7,000 MW demand
+
+EMISSIONS FACTORS:
+- Aviation: Narrow-body 850 kg CO2/cycle, Wide-body 2,500 kg CO2/cycle, Regional 450 kg CO2/cycle
+- Vehicles: Gasoline 0.39 kg CO2/mile, Diesel 0.41 kg CO2/mile, Hybrid 0.22 kg CO2/mile, EV 0.15 kg CO2/mile (grid-powered)
+- Buildings: NYC grid average 350 kg CO2/MWh
+- Trees: Average sequestration 21 kg CO2/year per tree
+
+SECTOR ANNUAL BASELINES (tons CO2/year):
+- Transport (all): ~15,000,000 tons/year
+- Transport (taxis only): ~425,000 tons/year
+- Transport (buses only): ~380,000 tons/year
+- Buildings: ~30,000,000 tons/year
+- Aviation (JFK): ~2,800,000 tons/year
+- Aviation (LaGuardia): ~2,200,000 tons/year
+- Energy/Grid: ~21,000,000 tons/year
+- Trees: -14,359 tons/year (negative = sequestration)
+
+CRITICAL ANALYSIS RULES:
+1. Use REAL NYC geography (JFK is in Queens, not Manhattan!)
+2. Calculate based on ACTUAL fleet sizes and usage patterns
+3. Account for secondary effects (EVs increase grid load by ~7 MWh/vehicle/year)
+4. Be CONSERVATIVE - real-world deployment takes time
+5. Flag unrealistic interventions (>50% fleet conversion in <5 years is unlikely)
+6. Consider infrastructure constraints (charging stations, grid capacity)
+7. Account for implementation costs and timelines
+
+Your task: Analyze user climate interventions and provide REALISTIC, DATA-DRIVEN predictions with detailed calculations.
+
+CRITICAL: Output ONLY valid JSON. Use plain numbers WITHOUT commas (write 51025 not 51,025). No markdown, no extra text.
+
+Output with this exact structure:
+{
+  "intervention_summary": "Brief 1-sentence description",
+  "borough": "Manhattan|Brooklyn|Queens|Bronx|Staten Island|citywide",
+  "sector": "transport|buildings|aviation|industry|energy|nature",
+  "subsector": "taxis|buses|commercial|residential|etc",
+  "is_feasible": true,
+  "feasibility_notes": "Why this is/isn't realistic given infrastructure and constraints",
+  "reduction_percent": 8.5,
+  "direction": "decrease",
+  "baseline_emissions_tons_year": 425000,
+  "reduced_emissions_tons_year": 389125,
+  "annual_impact_tons_co2": 35875,
+  "confidence_level": "high",
+  "grid_impact": {
+    "baseline_avg_intensity": 129290,
+    "reduced_avg_intensity": 118261,
+    "avg_change_percent": 8.5,
+    "baseline_median_intensity": 92257,
+    "reduced_median_intensity": 84375,
+    "median_change_percent": 8.5,
+    "baseline_peak_intensity": 3000000,
+    "reduced_peak_intensity": 2745000,
+    "peak_change_percent": 8.5,
+    "affected_area_km2": 59.5,
+    "notes": "Manhattan taxi corridors show highest reductions"
+  },
+  "geographic_hotspots": [
+    {"lat": 40.7589, "lon": -73.9857, "name": "Times Square", "intensity": 1.0}
+  ],
+  "secondary_effects": [
+    "Increased grid demand: +28,350 MWh/year (+9,923 tons CO2 from grid)",
+    "Need for 180 new Level 2 charging stations"
+  ],
+  "implementation_timeline": "3-5 years for full deployment",
+  "cost_estimate": "High",
+  "reasoning": "Detailed step-by-step calculation explanation"
+}
+
+IMPORTANT: Calculate grid_impact values based on:
+- baseline_avg_intensity: Current citywide average (tonnes CO2/km²/day) - use ~129.3 as baseline
+- baseline_median_intensity: Current citywide median (tonnes CO2/km²/day) - use ~92.3 as baseline
+- baseline_peak_intensity: Current peak hotspot (tonnes CO2/km²/day) - use ~3,000 for airports/dense areas
+- Apply reduction_percent to affected areas (e.g., Manhattan = 59.5 km², Queens airports = 200 km²)
+- Citywide averages will change less than local hotspots (dilution effect across 2,249 km² total grid)"""
     
     # Real NYC geographic data for AI analysis
     NYC_LANDMARKS = {
@@ -41,22 +129,28 @@ class AIPromptProcessor:
     
     def __init__(self, api_key: Optional[str] = None):
         """
-        Initialize with OpenAI API key for real AI analysis
+        Initialize with Claude API key for real AI analysis (Anthropic)
         """
-        self.api_key = api_key
-        self.use_openai = bool(api_key)
-        
-        if self.use_openai:
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        self.use_claude = False
+        self.claude_client = None
+
+        if anthropic_key and anthropic_key != "your_anthropic_api_key_here":
             try:
-                from openai import OpenAI
-                self.client = OpenAI(api_key=api_key)
-                print("[OK] OpenAI client initialized for advanced AI analysis")
+                import anthropic
+                self.claude_client = anthropic.Anthropic(api_key=anthropic_key)
+                self.use_claude = True
+                print("[OK] ✨ Claude client initialized for advanced emissions analysis")
+            except ImportError as e:
+                print(f"[ERROR] Failed to import anthropic module: {e}")
+                print(f"[ERROR] Run: pip install anthropic")
             except Exception as e:
-                print(f"[WARN] OpenAI initialization failed: {e}")
-                print("[INFO] Falling back to enhanced rule-based parsing")
-                self.use_openai = False
+                print(f"[ERROR] Claude initialization failed: {e}")
         else:
-            print("[INFO] No API key provided, using enhanced rule-based parsing")
+            print(f"[WARN] No valid ANTHROPIC_API_KEY found in environment")
+
+        if not self.use_claude:
+            print("[ERROR] Claude not initialized - using rule-based parsing only")
     
     def parse_prompt(self, prompt: str) -> Dict:
         """
@@ -75,21 +169,146 @@ class AIPromptProcessor:
                 - spatial_pattern: List[Tuple] (lat, lon, intensity) for unique patterns
                 - ai_analysis: str (detailed AI reasoning)
         """
-        print(f"[AI] Analyzing prompt with advanced AI: '{prompt}'")
-        
-        if self.use_openai:
+        print(f"[AI] Analyzing prompt: '{prompt}'")
+
+        # Try Claude first (best for emissions analysis)
+        if self.use_claude:
             try:
-                return self._analyze_with_ai(prompt)
+                return self._analyze_with_claude(prompt)
             except Exception as e:
-                print(f"[WARN] AI analysis failed: {e}")
-                print("[INFO] Falling back to enhanced rule-based parsing")
-                return self._parse_with_enhanced_rules(prompt)
-        else:
-            return self._parse_with_enhanced_rules(prompt)
+                print(f"[WARN] Claude analysis failed: {e}")
+                print("[INFO] Falling back to OpenAI or rules")
+
+        # Final fallback: rule-based
+        return self._parse_with_enhanced_rules(prompt)
     
-    def _analyze_with_ai(self, prompt: str) -> Dict:
+    def _analyze_with_claude(self, prompt: str) -> Dict:
         """
-        Advanced AI analysis using OpenAI to understand context and generate unique patterns
+        Advanced AI analysis using Claude (Anthropic) - optimized for emissions calculations
+        Claude provides superior reasoning for data-driven predictions
+        """
+        print("[CLAUDE] Using Claude for emissions analysis...")
+
+        user_message = f"""Analyze this NYC climate intervention:
+
+USER REQUEST: "{prompt}"
+
+Provide a realistic analysis considering:
+1. What specifically changes (which assets, how many, where)
+2. Current baseline emissions for that subsector
+3. Realistic reduction/increase percentage
+4. Geographic distribution (where impacts occur)
+5. Secondary effects on other sectors
+6. Feasibility constraints
+
+Be specific with numbers and locations. Use actual NYC geography."""
+
+        try:
+            message = self.claude_client.messages.create(
+                model="claude-3-haiku-20240307",  # Claude 3 Haiku (available with current API key)
+                max_tokens=2000,
+                temperature=0.3,  # Lower for more accurate/consistent results
+                system=self.CLAUDE_SYSTEM_PROMPT,
+                messages=[{
+                    "role": "user",
+                    "content": user_message
+                }]
+            )
+
+            response_text = message.content[0].text
+
+            # Clean up response text (remove control characters that break JSON parsing)
+            # Replace literal \n, \r, \t in strings with spaces
+            import re
+            response_text_cleaned = response_text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+
+            # Parse Claude's JSON response (Claude might wrap in ```json blocks)
+            json_match = re.search(r'```json\s*(.*?)\s*```', response_text_cleaned, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Use whole response as JSON
+                json_str = response_text_cleaned
+
+            # Additional cleanup: fix common JSON issues
+            json_str = json_str.strip()
+
+            # FIX: Remove thousands separators (commas in numbers like "51,025")
+            # This regex finds numbers with commas and removes the commas
+            json_str = re.sub(r':\s*(\d{1,3}(?:,\d{3})+)', lambda m: ': ' + m.group(1).replace(',', ''), json_str)
+
+            # Parse JSON
+            try:
+                analysis = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                # If that fails, try to extract just the JSON object
+                json_obj_match = re.search(r'\{.*\}', response_text_cleaned, re.DOTALL)
+                if json_obj_match:
+                    json_str_cleaned = json_obj_match.group()
+                    # Apply same comma fix
+                    json_str_cleaned = re.sub(r':\s*(\d{1,3}(?:,\d{3})+)', lambda m: ': ' + m.group(1).replace(',', ''), json_str_cleaned)
+                    analysis = json.loads(json_str_cleaned)
+                else:
+                    raise
+
+            print(f"[CLAUDE] ✓ Analysis complete: {analysis.get('intervention_summary', 'N/A')}")
+            print(f"[CLAUDE] Confidence: {analysis.get('confidence_level', 'unknown')}, Feasible: {analysis.get('is_feasible', 'unknown')}")
+
+            # Map Claude's response to our intervention format
+            intervention = {
+                # Core fields
+                "borough": analysis.get("borough", "citywide"),
+                "sector": analysis.get("sector", "transport"),
+                "subsector": analysis.get("subsector"),
+                "reduction_percent": abs(analysis.get("reduction_percent", 20.0)),
+                "direction": analysis.get("direction", "decrease"),
+                "description": analysis.get("intervention_summary", "Climate intervention"),
+
+                # Enhanced fields from Claude
+                "is_feasible": analysis.get("is_feasible", True),
+                "feasibility_notes": analysis.get("feasibility_notes", ""),
+                "confidence_level": analysis.get("confidence_level", "medium"),
+                "secondary_effects": analysis.get("secondary_effects", []),
+                "implementation_timeline": analysis.get("implementation_timeline", ""),
+                "cost_estimate": analysis.get("cost_estimate", ""),
+                "reasoning": analysis.get("reasoning", ""),
+
+                # Real emissions (Claude calculates these!)
+                "real_emissions": {
+                    "baseline_tons_co2": analysis.get("baseline_emissions_tons_year", 0),
+                    "reduced_tons_co2": analysis.get("reduced_emissions_tons_year", 0),
+                    "annual_savings_tons_co2": analysis.get("annual_impact_tons_co2", 0),
+                    "percentage_reduction": abs(analysis.get("reduction_percent", 20)),
+                    "direction": analysis.get("direction", "decrease"),
+                    "is_increase": analysis.get("direction", "decrease") == "increase",
+                    "confidence": analysis.get("confidence_level", "medium")
+                },
+
+                # Spatial pattern from Claude's geographic_hotspots
+                "spatial_pattern": [
+                    (h["lat"], h["lon"], h.get("intensity", 0.8))
+                    for h in analysis.get("geographic_hotspots", [])
+                ]
+            }
+
+            return intervention
+
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Claude returned invalid JSON: {e}")
+            print(f"[DEBUG] Full response (first 1000 chars):")
+            print(f"{response_text[:1000]}")
+            print(f"[DEBUG] Cleaned JSON string (first 1000 chars):")
+            print(f"{json_str[:1000]}")
+            raise
+        except Exception as e:
+            print(f"[ERROR] Claude API error: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    def _analyze_with_openai(self, prompt: str) -> Dict:
+        """
+        Fallback: Advanced AI analysis using OpenAI to understand context and generate unique patterns
         """
         system_message = """You are an expert NYC sustainability analyst with deep knowledge of:
 - NYC geography, neighborhoods, and landmarks
@@ -122,7 +341,7 @@ Format your response as JSON with these fields:
 
 Be specific about NYC landmarks, neighborhoods, and geographic features."""
         
-        response = self.client.chat.completions.create(
+        response = self.openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": system_message},
