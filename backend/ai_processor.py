@@ -258,6 +258,7 @@ Be specific with numbers and locations. Use actual NYC geography."""
                 model="claude-3-haiku-20240307",  # Claude 3 Haiku (available with current API key)
                 max_tokens=2000,
                 temperature=0.0,  # Set to 0 for deterministic/consistent results
+                top_p=1.0,  # Use full probability distribution for maximum determinism
                 system=self.CLAUDE_SYSTEM_PROMPT,
                 messages=[{
                     "role": "user",
