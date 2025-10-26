@@ -69,9 +69,6 @@ npm install
 npm run dev
 ```
 
-### Alternative: HTML Version
-Simply open `test-app.html` in your browser (backend must be running).
-
 ## 🎯 How It Works
 
 1. **AI Prompt Processing**: Parses natural language descriptions of sustainability actions
