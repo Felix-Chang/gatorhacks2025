@@ -1,4 +1,5 @@
-# CarbonIQ
+# CarbonIQ<img src="carboniq-logo.png" alt="CarbonIQ Logo" width="40" align="left"/>
+
 
 **An AI-powered climate impact simulator**
 
@@ -78,22 +79,12 @@ npm run dev
    - Description analysis (taxi vs bus patterns, solar vs green roof effects)
 3. **Map Visualization**: Displays baseline emissions and intervention impacts
 
-## 📊 Example Prompts
-
-Try these prompts to see different spatial patterns:
-
-- **"Convert 30% of taxis to EVs in Manhattan"** → Linear patterns along Broadway/5th Ave
-- **"Add solar panels to 50% of Brooklyn buildings"** → Dense clusters in Park Slope/Downtown Brooklyn  
-- **"Reduce citywide industrial emissions by 20%"** → Concentrated zones near JFK/LaGuardia/ports
-- **"Convert Staten Island buses to electric"** → Route-based patterns on Staten Island
-- **"Install green roofs on 25% of Queens buildings"** → Building density patterns in Long Island City
-
 ## 🗺️ Map Features
 
 - **Baseline Emissions**: Red dots showing current NYC emission data
 - **Simulation Results**: Green dots showing intervention impact
 - **Impact Difference**: Color-coded visualization of reduction percentages
-- **Interactive Popups**: Detailed emission data for each location
+- **Interactive Popups**: Detailed emission data for each map marker
 
 ## 🧠 AI Technology
 
@@ -122,7 +113,7 @@ Try these prompts to see different spatial patterns:
 
 - **Dynamic Range Calculation**: Each dataset is normalized for optimal visualization
 - **Color-Coded Impact**: Red (baseline) → Green (simulation) → Color-coded (difference)
-- **Interactive Elements**: Click any dot for detailed emission data
+- **Interactive Elements**: Click any map marker for detailed emission data
 - **Console Logging**: Debug information showing data ranges and patterns
 
 ## 🚀 Future Enhancements
