@@ -39,11 +39,19 @@ git clone https://github.com/Felix-Chang/gatorhacks2025.git
 ```
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.11 (must be this specific version of Python)
 - Node.js 18+
 - Modern web browser
 
 ### Backend Setup
+
+The website requires an Anthropic API key to function properly. In order to run the website, you must create a file named `.env` inside the backend folder and put in your API key:
+
+**.env**
+```
+ANTHROPIC_API_KEY="your_anthropic_api_key_here"
+```
+
 **Windows**
 ```
 cd backend
