@@ -951,50 +951,65 @@ function App() {
       {/* Statistics Grid */}
       {(stats || statistics) && (
         <div className="stats-section fade-in">
-          {statistics && (
-            <div className="stat-card glass featured-stat">
+          {intervention && (
+            <div className="stat-card glass">
               <h3 className="stat-card-title">
-                Emissions Impact Analysis
-                {statistics?.confidence && (
-                  <span className={`confidence-badge ${statistics.confidence}`}>
-                    {statistics.confidence} confidence
+                Intervention Summary
+                {intervention?.confidence_level && (
+                  <span className={`confidence-badge ${intervention.confidence_level}`}>
+                    {intervention.confidence_level} confidence
                   </span>
                 )}
               </h3>
-              <div className="stat-row-featured">
-                <div className="stat-col">
-                  <span className="stat-label-featured">Current Emissions</span>
-                  <span className="stat-value-featured">{formatAnnualEmissions(statistics?.baseline_tons_co2 || 0, unitSystem, false)} / year</span>
-                  <span className="stat-sublabel">Baseline for this sector</span>
-                </div>
-                <div className="stat-divider">→</div>
-                <div className="stat-col">
-                  <span className="stat-label-featured">With Intervention</span>
-                  <span className={`stat-value-featured ${statistics?.is_increase ? 'increase' : 'success'}`}>{formatAnnualEmissions(statistics?.reduced_tons_co2 || 0, unitSystem, false)} / year</span>
-                  <span className="stat-sublabel">After implementation</span>
-                </div>
+
+              {/* Brief summary */}
+              <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '8px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
+                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>{intervention.description}</p>
               </div>
-              <div className="stat-savings">
-                {statistics?.is_unrelated ? (
-                  <>
-                    <span className="savings-label">Climate Impact</span>
-                    <span className="savings-value neutral">No measurable effect</span>
-                    <span className="savings-percent neutral">(0% change - unrelated query)</span>
-                  </>
-                ) : statistics ? (
-                  <>
-                    <span className="savings-label">
-                      {statistics?.is_increase ? 'Net Emissions Increase' : 'Net Emissions Reduction'}
+
+              {/* Average change percentage */}
+              {statistics && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Average Emission Change</span>
+                    <span className={`stat-value ${statistics?.is_increase ? 'increase' : 'decrease'}`} style={{ fontSize: '1.5rem', fontWeight: '600' }}>
+                      {statistics?.is_increase ? '+' : '−'}{Math.abs(statistics?.percentage_reduction || 0).toFixed(1)}%
                     </span>
-                    <span className={`savings-value ${statistics?.is_increase ? 'increase' : 'decrease'}`}>
-                      {statistics?.is_increase ? '+' : '−'}{formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, false)} CO₂ / year
-                    </span>
-                    <span className={`savings-percent ${statistics?.is_increase ? 'increase' : 'decrease'}`}>
-                      ({statistics?.is_increase ? '+' : '−'}{Math.abs(statistics?.percentage_reduction || 0).toFixed(1)}% change in sector emissions)
-                    </span>
-                  </>
-                ) : null}
-              </div>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    {statistics?.is_increase
+                      ? `${formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} added per year`
+                      : `${formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} saved per year`
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* Expandable calculations & analysis */}
+              {intervention.reasoning && (
+                <details style={{ marginTop: '1rem' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
+                    Calculations & Analysis
+                  </summary>
+                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(17, 24, 39, 0.3)', borderRadius: '6px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                    {intervention.reasoning}
+                  </div>
+                </details>
+              )}
+
+              {/* Secondary impacts */}
+              {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
+                <details style={{ marginTop: '1rem' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
+                    Secondary Impacts
+                  </summary>
+                  <ul style={{ marginTop: '0.75rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                    {intervention.secondary_impacts.map((impact, i) => (
+                      <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           )}
           
@@ -1047,116 +1062,6 @@ function App() {
         </div>
       )}
 
-      {/* Intervention Details */}
-      {intervention && (
-        <div className="intervention-details glass fade-in">
-          <h3 className="details-title">
-            Intervention Analysis
-            {intervention.confidence_level && (
-              <span className={`confidence-badge ${intervention.confidence_level}`}>
-                {intervention.confidence_level} confidence
-              </span>
-            )}
-          </h3>
-
-          {/* User's Intervention Request */}
-          <div className="intervention-summary">
-            <div className="summary-text">
-              <strong>Scenario:</strong> {intervention.description}
-            </div>
-          </div>
-
-          {/* Claude's Analysis Results */}
-          <div className="details-grid">
-            <div className="detail-item">
-              <span className="detail-label">Affected Sector</span>
-              <span className="detail-value">{intervention.sector}</span>
-            </div>
-            {intervention.subsector && (
-              <div className="detail-item">
-                <span className="detail-label">Specific Target</span>
-                <span className="detail-value">{intervention.subsector}</span>
-              </div>
-            )}
-            <div className="detail-item">
-              <span className="detail-label">Geographic Area</span>
-              <span className="detail-value">{intervention.borough || 'Citywide'}</span>
-            </div>
-            <div className="detail-item">
-              <span className="detail-label">Calculated Impact</span>
-              <span className={`detail-value ${statistics?.is_increase ? 'not-feasible' : 'feasible'}`}>
-                {statistics?.is_increase ? '+' : '−'}{Math.abs(statistics?.percentage_reduction || intervention.reduction_percent || intervention.magnitude_percent || 0).toFixed(1)}% emissions
-              </span>
-            </div>
-            <div className="detail-item full-width">
-              <span className="detail-label">What This Means</span>
-              <span className="detail-value detail-text">
-                {statistics?.is_increase
-                  ? `This intervention would increase emissions in the ${intervention.sector} sector by ${Math.abs(statistics?.percentage_reduction || 0).toFixed(1)}% annually.`
-                  : `This intervention would reduce ${intervention.sector} sector emissions by ${Math.abs(statistics?.percentage_reduction || intervention.reduction_percent || 0).toFixed(1)}% per year.`
-                }
-              </span>
-            </div>
-          </div>
-
-          {/* Feasibility & Timeline */}
-          {(intervention.is_feasible !== undefined || intervention.implementation_timeline) && (
-            <div className="details-section">
-              <h4 className="section-subtitle">Feasibility Assessment</h4>
-              <div className="details-grid">
-                {intervention.is_feasible !== undefined && (
-                  <div className="detail-item">
-                    <span className="detail-label">Feasibility</span>
-                    <span className={`detail-value ${intervention.is_feasible ? 'feasible' : 'not-feasible'}`}>
-                      {intervention.is_feasible ? '✓ Feasible' : '⚠ Low Feasibility'}
-                    </span>
-                  </div>
-                )}
-                {intervention.implementation_timeline && (
-                  <div className="detail-item">
-                    <span className="detail-label">Timeline</span>
-                    <span className="detail-value">{intervention.implementation_timeline}</span>
-                  </div>
-                )}
-                {intervention.cost_estimate && (
-                  <div className="detail-item">
-                    <span className="detail-label">Cost Estimate</span>
-                    <span className="detail-value">{intervention.cost_estimate}</span>
-                  </div>
-                )}
-                {intervention.feasibility_notes && (
-                  <div className="detail-item full-width">
-                    <span className="detail-label">Notes</span>
-                    <span className="detail-value detail-text">{intervention.feasibility_notes}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Secondary Effects */}
-          {intervention.secondary_effects && intervention.secondary_effects.length > 0 && (
-            <div className="details-section">
-              <h4 className="section-subtitle">Secondary Impacts</h4>
-              <ul className="secondary-effects-list">
-                {intervention.secondary_effects.map((effect, i) => (
-                  <li key={i} className="secondary-effect-item">{effect}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* AI Reasoning (Expandable) */}
-          {intervention.reasoning && (
-            <details className="ai-reasoning">
-              <summary>View AI Analysis & Calculations</summary>
-              <div className="reasoning-content">
-                <p>{intervention.reasoning}</p>
-              </div>
-            </details>
-          )}
-        </div>
-      )}
 
       {/* Error Display */}
       {error && (

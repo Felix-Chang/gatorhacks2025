@@ -58,55 +58,52 @@ CRITICAL ANALYSIS RULES:
 6. Consider infrastructure constraints (charging stations, grid capacity)
 7. Account for implementation costs and timelines
 
-Your task: Analyze user climate interventions and provide REALISTIC, DATA-DRIVEN predictions with detailed calculations.
+Your task: Analyze user climate interventions and provide REALISTIC, DATA-DRIVEN predictions with geographic-specific modification instructions.
 
 CRITICAL: Output ONLY valid JSON. Use plain numbers WITHOUT commas (write 51025 not 51,025). No markdown, no extra text.
 
 Output with this exact structure:
 {
-  "intervention_summary": "Brief 1-sentence description",
+  "summary": "Brief 1-sentence description of the intervention",
   "borough": "Manhattan|Brooklyn|Queens|Bronx|Staten Island|citywide",
   "sector": "transport|buildings|aviation|industry|energy|nature",
   "subsector": "taxis|buses|commercial|residential|etc",
-  "is_feasible": true,
-  "feasibility_notes": "Why this is/isn't realistic given infrastructure and constraints",
-  "reduction_percent": 8.5,
-  "direction": "decrease",
+  "direction": "decrease|increase",
   "baseline_emissions_tons_year": 425000,
   "reduced_emissions_tons_year": 389125,
   "annual_impact_tons_co2": 35875,
-  "confidence_level": "high",
-  "grid_impact": {
-    "baseline_avg_intensity": 129290,
-    "reduced_avg_intensity": 118261,
-    "avg_change_percent": 8.5,
-    "baseline_median_intensity": 92257,
-    "reduced_median_intensity": 84375,
-    "median_change_percent": 8.5,
-    "baseline_peak_intensity": 3000000,
-    "reduced_peak_intensity": 2745000,
-    "peak_change_percent": 8.5,
-    "affected_area_km2": 59.5,
-    "notes": "Manhattan taxi corridors show highest reductions"
-  },
+  "average_change_percent": 8.5,
+  "geographic_modifications": [
+    {"area": "JFK Airport", "lat": 40.6413, "lon": -73.7781, "change_percent": -25, "type": "hotspot", "radius_km": 5},
+    {"area": "Manhattan", "change_percent": -15, "type": "borough"},
+    {"area": "citywide_baseline", "change_percent": -5, "type": "baseline"}
+  ],
   "geographic_hotspots": [
     {"lat": 40.7589, "lon": -73.9857, "name": "Times Square", "intensity": 1.0}
   ],
-  "secondary_effects": [
+  "reasoning": "Detailed step-by-step calculation explanation showing how you arrived at each geographic modification",
+  "secondary_impacts": [
     "Increased grid demand: +28,350 MWh/year (+9,923 tons CO2 from grid)",
     "Need for 180 new Level 2 charging stations"
   ],
-  "implementation_timeline": "3-5 years for full deployment",
-  "cost_estimate": "High",
-  "reasoning": "Detailed step-by-step calculation explanation"
+  "confidence_level": "high|medium|low"
 }
 
-IMPORTANT: Calculate grid_impact values based on:
-- baseline_avg_intensity: Current citywide average (tonnes CO2/km²/day) - use ~64.7 as baseline
-- baseline_median_intensity: Current citywide median (tonnes CO2/km²/day) - use ~46.2 as baseline
-- baseline_peak_intensity: Current peak hotspot (tonnes CO2/km²/day) - use ~1,500 for airports/dense areas
-- Apply reduction_percent to affected areas (e.g., Manhattan = 59.5 km², Queens airports = 200 km²)
-- Citywide averages will change less than local hotspots (dilution effect across 2,249 km² total grid)"""
+IMPORTANT INSTRUCTIONS FOR GEOGRAPHIC MODIFICATIONS:
+- Use "type": "hotspot" for specific locations (airports, industrial zones) with lat/lon coordinates and radius
+- Use "type": "borough" for borough-wide changes (Manhattan, Brooklyn, Queens, Bronx, Staten Island)
+- Use "type": "baseline" for citywide minimum emission adjustments
+- change_percent should be NEGATIVE for reductions, POSITIVE for increases
+- Be specific: different areas should have different change_percent values based on the intervention
+- Example: Converting Manhattan taxis to EVs would have high impact in Manhattan (-20%), moderate in other boroughs (-8%)
+- Example: SAF at JFK would have very high impact at JFK hotspot (-30%), minimal citywide (-2%)
+
+CURRENT BASELINE VALUES:
+- Average citywide: ~64.7 tonnes CO2/km²/day
+- Airport hotspots (JFK): ~1,500 tonnes CO2/km²/day
+- Airport hotspots (LaGuardia): ~1,000 tonnes CO2/km²/day
+- Manhattan commercial: ~100-150 tonnes CO2/km²/day
+- Citywide minimum: ~4 tonnes CO2/km²/day"""
     
     # Real NYC geographic data for AI analysis
     NYC_LANDMARKS = {
@@ -251,8 +248,8 @@ Be specific with numbers and locations. Use actual NYC geography."""
                 else:
                     raise
 
-            print(f"[CLAUDE] ✓ Analysis complete: {analysis.get('intervention_summary', 'N/A')}")
-            print(f"[CLAUDE] Confidence: {analysis.get('confidence_level', 'unknown')}, Feasible: {analysis.get('is_feasible', 'unknown')}")
+            print(f"[CLAUDE] ✓ Analysis complete: {analysis.get('summary', 'N/A')}")
+            print(f"[CLAUDE] Confidence: {analysis.get('confidence_level', 'unknown')}, Average change: {analysis.get('average_change_percent', 0)}%")
 
             # Map Claude's response to our intervention format
             intervention = {
@@ -260,17 +257,16 @@ Be specific with numbers and locations. Use actual NYC geography."""
                 "borough": analysis.get("borough", "citywide"),
                 "sector": analysis.get("sector", "transport"),
                 "subsector": analysis.get("subsector"),
-                "reduction_percent": abs(analysis.get("reduction_percent", 20.0)),
                 "direction": analysis.get("direction", "decrease"),
-                "description": analysis.get("intervention_summary", "Climate intervention"),
+                "description": analysis.get("summary", "Climate intervention"),
+
+                # Geographic modifications (NEW - this is the key change!)
+                "geographic_modifications": analysis.get("geographic_modifications", []),
+                "average_change_percent": abs(analysis.get("average_change_percent", 20.0)),
 
                 # Enhanced fields from Claude
-                "is_feasible": analysis.get("is_feasible", True),
-                "feasibility_notes": analysis.get("feasibility_notes", ""),
                 "confidence_level": analysis.get("confidence_level", "medium"),
-                "secondary_effects": analysis.get("secondary_effects", []),
-                "implementation_timeline": analysis.get("implementation_timeline", ""),
-                "cost_estimate": analysis.get("cost_estimate", ""),
+                "secondary_impacts": analysis.get("secondary_impacts", []),
                 "reasoning": analysis.get("reasoning", ""),
 
                 # Real emissions (Claude calculates these!)
@@ -278,7 +274,7 @@ Be specific with numbers and locations. Use actual NYC geography."""
                     "baseline_tons_co2": analysis.get("baseline_emissions_tons_year", 0),
                     "reduced_tons_co2": analysis.get("reduced_emissions_tons_year", 0),
                     "annual_savings_tons_co2": analysis.get("annual_impact_tons_co2", 0),
-                    "percentage_reduction": abs(analysis.get("reduction_percent", 20)),
+                    "percentage_reduction": abs(analysis.get("average_change_percent", 20)),
                     "direction": analysis.get("direction", "decrease"),
                     "is_increase": analysis.get("direction", "decrease") == "increase",
                     "confidence": analysis.get("confidence_level", "medium")

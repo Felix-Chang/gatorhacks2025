@@ -536,21 +536,21 @@ class NYCEmissionsData:
     
     def apply_intervention(self, intervention: Dict) -> List[Tuple[float, float, float]]:
         """
-        Apply intervention to emissions grid
-        
+        Apply intervention to emissions grid using geographic-specific modifications
+
         Args:
             intervention: Dict with keys:
-                - borough: str or "citywide"
-                - sector: str (transport, buildings, industry)
-                - reduction_percent: float
+                - geographic_modifications: List of modification rules
+                - average_change_percent: float (overall average change)
                 - description: str
+                - spatial_pattern: List of (lat, lon, intensity) tuples
         """
         if self.baseline_cache is None:
             self._generate_baseline()
-        
+
         lats, lons, baseline_emissions = self.baseline_cache
         modified_emissions = baseline_emissions.copy()
-        
+
         # Handle unrelated prompts - no change to emissions
         if intervention.get('is_unrelated'):
             print("[INFO] Unrelated prompt detected - no emissions impact")
@@ -567,115 +567,73 @@ class NYCEmissionsData:
                 for j, lon in enumerate(lons):
                     points.append((lat, lon, baseline_emissions[i, j]))
             return points
-        
-        borough = intervention.get('borough', 'citywide')
-        reduction_value = intervention.get('reduction_percent', intervention.get('magnitude_percent', 0)) / 100.0
-        direction = intervention.get('direction', 'decrease')
-        if direction == 'increase':
-            reduction_value = -reduction_value
-        sector = intervention.get('sector', 'transport')
-        description = intervention.get('description', '')
-        
-        print(f"[>] Applying intervention: {reduction_value*100}% change in {sector} for {borough}")
 
-        # IMPORTANT: Check if Claude already provided emissions calculations
-        # If so, use Claude's calculations (they're more accurate and context-aware)
-        real_emissions_data = None
-        if 'real_emissions' in intervention:
-            # Claude already calculated emissions - use those!
-            real_emissions_data = intervention['real_emissions']
-            print(f"[CLAUDE] Using Claude-calculated emissions:")
-            print(f"         Baseline: {real_emissions_data.get('baseline_tons_co2', 0):,.0f} tons CO2/year")
-            print(f"         After intervention: {real_emissions_data.get('reduced_tons_co2', 0):,.0f} tons CO2/year")
-            print(f"         Annual savings: {real_emissions_data.get('annual_savings_tons_co2', 0):,.0f} tons CO2/year")
-        elif self.data_loader:
-            # Fallback: Use data_loader calculations if Claude didn't provide them
-            try:
-                real_emissions_data = self.data_loader.get_emissions_for_sector(sector, intervention)
-                print(f"[DATA] Real emissions calculated (fallback):")
-                print(f"       Baseline: {real_emissions_data['baseline_tons_co2']:,.0f} tons CO2/year")
-                print(f"       After intervention: {real_emissions_data['reduced_tons_co2']:,.0f} tons CO2/year")
-                print(f"       Annual savings: {real_emissions_data['annual_savings_tons_co2']:,.0f} tons CO2/year")
-                # Store in intervention for API response
-                intervention['real_emissions'] = real_emissions_data
-            except Exception as e:
-                print(f"[WARN] Could not calculate real emissions: {e}")
-        
-        # Sector-specific reduction factors (for grid visualization)
-        sector_factors = {
-            'transport': 0.35,  # Transport is ~35% of urban CO₂
-            'buildings': 0.45,  # Buildings ~45%
-            'industry': 0.20,   # Industry ~20%
-            'energy': 0.30,
-            'nature': 0.10,
-            'aviation': 0.05,  # Aviation ~5%
-            'all': 1.0
-        }
-        
-        sector_factor = sector_factors.get(sector, sector_factors['all'])
-        effective_reduction = reduction_value * sector_factor
-        
-        # Use AI-generated spatial pattern if available
-        if 'spatial_pattern' in intervention:
-            # Apply AI-generated spatial pattern
-            ai_pattern = intervention['spatial_pattern']
-            
-            # Enhance with real facility locations if available
-            if self.data_loader:
-                try:
-                    real_spatial = self.data_loader.get_spatial_data_for_sector(sector, intervention)
-                    if real_spatial:
-                        # Add real facility locations to pattern with high intensity
-                        ai_pattern = list(ai_pattern) + real_spatial
-                        print(f"[DATA] Added {len(real_spatial)} real facility locations")
-                except Exception as e:
-                    print(f"[WARN] Could not add real spatial data: {e}")
-            
-            print(f"[AI] Applying {len(ai_pattern)} spatial points")
-            
-            # Create dramatic spatial variations based on AI pattern
-            for pattern_lat, pattern_lon, pattern_intensity in ai_pattern:
-                # Apply reduction to nearby grid points with distance-based falloff
+        geographic_modifications = intervention.get('geographic_modifications', [])
+        description = intervention.get('description', '')
+
+        print(f"[>] Applying geographic modifications: {len(geographic_modifications)} rules")
+        for mod in geographic_modifications:
+            print(f"    - {mod.get('area', 'Unknown')}: {mod.get('change_percent', 0)}% ({mod.get('type', 'unknown')})")
+
+        # Apply each geographic modification
+        for mod in geographic_modifications:
+            mod_type = mod.get('type')
+            change_percent = mod.get('change_percent', 0) / 100.0  # Convert to decimal
+            area = mod.get('area', 'Unknown')
+
+            if mod_type == 'hotspot':
+                # Apply to specific hotspot location with radius
+                target_lat = mod.get('lat')
+                target_lon = mod.get('lon')
+                radius_km = mod.get('radius_km', 5)
+                radius_deg = radius_km / 111.0  # Approximate conversion to degrees
+
+                print(f"[HOTSPOT] Applying {change_percent*100}% to {area} (radius: {radius_km}km)")
+
                 for i, lat in enumerate(lats):
                     for j, lon in enumerate(lons):
-                        # CRITICAL: Only apply to points within the target borough
-                        if not self._is_in_target_area(lat, lon, borough):
-                            continue
-                            
-                        distance = np.sqrt((lat - pattern_lat)**2 + (lon - pattern_lon)**2)
-                        
-                        # Create larger impact radius (0.08 degrees ≈ 8km) for more visible effects
-                        if distance < 0.08:
-                            # Calculate impact based on distance and intensity
-                            impact_factor = pattern_intensity * (1 - distance * 12)  # Slower falloff
-                            impact_factor = max(0.3, impact_factor)  # Higher minimum impact
-                            
-                            # Apply dramatic reduction based on AI pattern
-                            reduction_factor = 1.0 - (effective_reduction * impact_factor * 3.0)  # 3x multiplier for visibility
-                            modified_emissions[i, j] *= max(0.01, reduction_factor)  # Allow very deep reductions
+                        distance = np.sqrt((lat - target_lat)**2 + (lon - target_lon)**2)
+                        if distance < radius_deg:
+                            # Gaussian falloff from center
+                            intensity = np.exp(-distance**2 / (2 * (radius_deg/2.0)**2))
+                            reduction_factor = 1.0 + (change_percent * intensity)
+                            modified_emissions[i, j] *= max(0.01, reduction_factor)
 
-                            # Add deterministic variation based on coordinates + DESCRIPTION for uniqueness
-                            # This ensures different interventions produce different patterns
-                            unique_seed = f"{lat:.3f}_{lon:.3f}_{pattern_lat:.3f}_{pattern_lon:.3f}_{description}"
-                            coord_hash = hash(unique_seed) % 1000
-                            variation_factor = 0.7 + (coord_hash / 1000.0) * 0.6  # 0.7 to 1.3 range
-                            modified_emissions[i, j] *= variation_factor
-        else:
-            # Fallback to old pattern generation
-            intervention_pattern = self._create_ai_spatial_pattern(
-                lats, lons, borough, sector, description, reduction
-            )
-            
-            # Apply reduction with AI-generated spatial pattern
-            for i, lat in enumerate(lats):
-                for j, lon in enumerate(lons):
-                    if self._is_in_target_area(lat, lon, borough):
-                        # Get AI-calculated spatial intensity for this point
-                        spatial_intensity = intervention_pattern[i, j]
-                        
-                        # Apply reduction scaled by AI spatial intensity
-                        reduction_factor = 1.0 - (effective_reduction * spatial_intensity)
-                        modified_emissions[i, j] *= max(0.05, reduction_factor)  # Keep minimum 5%
+            elif mod_type == 'borough':
+                # Apply to entire borough
+                print(f"[BOROUGH] Applying {change_percent*100}% to {area}")
+
+                for i, lat in enumerate(lats):
+                    for j, lon in enumerate(lons):
+                        if self._is_in_target_area(lat, lon, area):
+                            reduction_factor = 1.0 + change_percent
+                            modified_emissions[i, j] *= max(0.01, reduction_factor)
+
+            elif mod_type == 'baseline':
+                # Apply to citywide baseline (minimum values)
+                print(f"[BASELINE] Applying {change_percent*100}% to citywide minimum")
+
+                # Only modify low-emission areas (< 20 tonnes/km²/day)
+                for i, lat in enumerate(lats):
+                    for j, lon in enumerate(lons):
+                        if baseline_emissions[i, j] < 20:
+                            reduction_factor = 1.0 + change_percent
+                            modified_emissions[i, j] *= max(0.01, reduction_factor)
+
+        # Apply spatial pattern for visual variation if available
+        if 'spatial_pattern' in intervention:
+            ai_pattern = intervention['spatial_pattern']
+            print(f"[SPATIAL] Applying {len(ai_pattern)} pattern points for visualization")
+
+            for pattern_lat, pattern_lon, pattern_intensity in ai_pattern:
+                for i, lat in enumerate(lats):
+                    for j, lon in enumerate(lons):
+                        distance = np.sqrt((lat - pattern_lat)**2 + (lon - pattern_lon)**2)
+
+                        if distance < 0.05:  # ~5km radius for subtle variations
+                            # Add subtle variation (±10%) based on spatial pattern
+                            variation = 1.0 + (pattern_intensity - 0.5) * 0.2
+                            modified_emissions[i, j] *= variation
         
         # Convert to list of points
         points = []
