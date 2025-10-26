@@ -771,7 +771,7 @@ function App() {
                         </span>
                         <span className="stat-value">
                           {conv.statistics?.is_increase
-                            ? `+${formatAnnualEmissions(Math.abs(conv.statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} added`
+                            ? `${formatAnnualEmissions(Math.abs(conv.statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} added`
                             : `${formatAnnualEmissions(Math.abs(conv.statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} saved`
                           }
                         </span>

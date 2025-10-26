@@ -76,15 +76,15 @@ export function formatEmissionIntensity(value, unit = 'metric') {
 export function formatAnnualEmissions(tons, unit = 'metric', abbreviated = true) {
   const converted = convertAnnualEmissions(tons, unit);
   const unitLabel = unit === 'imperial' ? 'tons' : 'tonnes'; // US tons vs metric tonnes
-  
+
   if (abbreviated) {
     if (Math.abs(converted) >= 1000000) {
-      return `${(converted / 1000000).toFixed(1)}M ${unitLabel}`;
+      return `${(converted / 1000000).toFixed(1)}M ${unitLabel}/year`;
     } else if (Math.abs(converted) >= 1000) {
-      return `${(converted / 1000).toFixed(1)}K ${unitLabel}`;
+      return `${(converted / 1000).toFixed(1)}K ${unitLabel}/year`;
     }
   }
-  
+
   return `${converted.toLocaleString()} ${unitLabel}`;
 }
 
