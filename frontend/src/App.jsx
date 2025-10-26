@@ -1234,6 +1234,8 @@ function App() {
                           {(() => {
                             const percentChange = ((baselineAverage - displayStats.avgValue) / baselineAverage) * 100
                             const simulatedTotal = baselineMetadata.annual_emissions_tonnes * (1 - percentChange / 100)
+                            const absPercent = Math.abs(percentChange)
+                            const isZero = absPercent < 0.05
                             const isIncrease = percentChange < 0 // negative percentChange means emissions went up
                             
                             return (
@@ -1241,7 +1243,7 @@ function App() {
                                 <div style={{ 
                                   fontSize: '1.75rem', 
                                   fontWeight: '700', 
-                                  color: isIncrease ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)', // Red if increase, green if decrease
+                                  color: isZero ? 'rgba(255, 255, 255, 0.5)' : (isIncrease ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)'), // Grey if zero, Red if increase, green if decrease
                                   marginBottom: '0.35rem'
                                 }}>
                                   {formatEmissionsWithPeriod(

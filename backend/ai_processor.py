@@ -64,6 +64,16 @@ CRITICAL ANALYSIS RULES:
 6. Consider infrastructure constraints (charging stations, grid capacity)
 7. Account for implementation costs and timelines
 
+CRITICAL: Handle percentage scaling accurately!
+- If user says "Convert 10% of taxis to EVs", change_percent should be SMALLER than if they say "Convert 30%"
+- Examples of proper scaling:
+  * "Convert 10% of Manhattan taxis" → Manhattan change_percent: -4% to -6%
+  * "Convert 30% of Manhattan taxis" → Manhattan change_percent: -12% to -18%
+  * "Install solar on 25% of buildings" → affected boroughs: -8% to -12%
+  * "Install solar on 50% of buildings" → affected boroughs: -16% to -24%
+- The change_percent values in geographic_modifications MUST scale proportionally with the percentage in the user's prompt!
+- If you see "10%" in the prompt, use SMALLER change_percent values than if you see "30%" for the same intervention type!
+
 Your task: Analyze user climate interventions and provide REALISTIC, DATA-DRIVEN geographic modification instructions.
 
 CRITICAL: Output ONLY valid JSON. Use plain numbers WITHOUT commas (write 51025 not 51,025). No markdown, no extra text.
@@ -250,6 +260,11 @@ Otherwise, provide a realistic analysis considering:
 4. Geographic distribution (where impacts occur)
 5. Secondary effects on other sectors
 6. Feasibility constraints
+
+IMPORTANT: Look for PERCENTAGES in the user's prompt (e.g., "10%", "30%", "50%")
+- These percentages indicate the SCALE of the intervention
+- If the user says "Convert 10% of taxis", the change_percent values should be SMALLER than "Convert 30% of taxis"
+- Scale all geographic_modifications change_percent values proportionally to the percentage in the prompt!
 
 Be specific with numbers and locations. Use actual NYC geography."""
 
