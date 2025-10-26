@@ -111,7 +111,7 @@ class NYCEmissionsData:
         self.last_update = datetime.now()
         
         print(f"[OK] Baseline generated: {self.grid_resolution}x{self.grid_resolution} grid")
-        print(f"[STAT] Emission range: {emissions_grid.min():.1f} - {emissions_grid.max():.1f} kg CO2/km^2/day")
+        print(f"[STAT] Emission range: {emissions_grid.min():.1f} - {emissions_grid.max():.1f} tonnes CO2/km^2/day")
     
     def _generate_from_real_data(self, lats, lons):
         """
@@ -129,8 +129,8 @@ class NYCEmissionsData:
         
         Target: 100,000-300,000 tonnes/day citywide to match NYC GHG inventory scale
         Source: NYC Mayor's Office GHG Inventories (tens of millions tonnes/year)
-        
-        Returns: emissions_grid (numpy array) in kg CO₂/km²/day
+
+        Returns: emissions_grid (numpy array) in tonnes CO₂/km²/day
         """
         print("[REAL-DATA] Calculating emissions from actual NYC data...")
         print("[SCOPE] Aviation + Urban activity (subset of full NYC inventory)")
@@ -145,14 +145,14 @@ class NYCEmissionsData:
         print(f"[GRID] Cell area: {cell_area_km2:.4f} km² ({self.grid_resolution}x{self.grid_resolution} = {self.grid_resolution**2} cells)")
         
         # RESCALED TO MATCH NYC INVENTORY BENCHMARKS
-        # Target: 150,000-200,000 tonnes/day citywide (mid-range of 100k-300k)
-        # Average per km²: 150,000-250,000 kg/km²/day
+        # Target: 75,000-100,000 tonnes/day citywide (mid-range of 50k-150k)
+        # Average per km²: 75-125 tonnes/km²/day
         
-        # 1. AIRPORTS - Peak hotspots (1M-5M kg/km²/day at center)
+        # 1. AIRPORTS - Peak hotspots (500-2,500 tonnes/km²/day at center)
         print("[REAL-DATA] Adding airport emissions hotspots...")
         airports = [
-            {'name': 'JFK', 'lat': 40.6413, 'lon': -73.7781, 'peak_density_kg_km2_day': 3000000},  # 3M kg/km²/day peak
-            {'name': 'LaGuardia', 'lat': 40.7769, 'lon': -73.8740, 'peak_density_kg_km2_day': 2000000}  # 2M kg/km²/day peak
+            {'name': 'JFK', 'lat': 40.6413, 'lon': -73.7781, 'peak_density_tonne_km2_day': 1500},  # 1,500 metric tonnes/km²/day peak
+            {'name': 'LaGuardia', 'lat': 40.7769, 'lon': -73.8740, 'peak_density_tonne_km2_day': 1000}  # 1,000 metric tonnes/km²/day peak
         ]
         
         for airport in airports:
@@ -162,7 +162,7 @@ class NYCEmissionsData:
             if 0 <= i < self.grid_resolution and 0 <= j < self.grid_resolution:
                 # Distribute airport emissions with Gaussian falloff from peak
                 radius_cells = 6  # Concentrated footprint
-                peak_density = airport['peak_density_kg_km2_day']
+                peak_density = airport['peak_density_tonne_km2_day']
                 
                 for di in range(-radius_cells, radius_cells + 1):
                     for dj in range(-radius_cells, radius_cells + 1):
@@ -174,12 +174,12 @@ class NYCEmissionsData:
                                 intensity = np.exp(-distance**2 / (2 * (radius_cells/3.0)**2))
                                 emissions_grid[ni, nj] += peak_density * intensity
         
-        # 2. MANHATTAN HOTSPOTS - High-density commercial (200k-300k kg/km²/day)
+        # 2. MANHATTAN HOTSPOTS - High-density commercial (100-150 tonnes/km²/day)
         print("[REAL-DATA] Adding Manhattan urban hotspots...")
         hotspots = [
-            {'name': 'Midtown/Times Square', 'lat': 40.758, 'lon': -73.9855, 'emissions_kg_km2_day': 280000, 'radius': 3},
-            {'name': 'Financial District', 'lat': 40.7074, 'lon': -74.0113, 'emissions_kg_km2_day': 250000, 'radius': 2},
-            {'name': 'Upper West Side', 'lat': 40.7870, 'lon': -73.9754, 'emissions_kg_km2_day': 220000, 'radius': 2},
+            {'name': 'Midtown/Times Square', 'lat': 40.758, 'lon': -73.9855, 'emissions_tonne_km2_day': 140, 'radius': 3},
+            {'name': 'Financial District', 'lat': 40.7074, 'lon': -74.0113, 'emissions_tonne_km2_day': 125, 'radius': 2},
+            {'name': 'Upper West Side', 'lat': 40.7870, 'lon': -73.9754, 'emissions_tonne_km2_day': 110, 'radius': 2},
         ]
         
         for hotspot in hotspots:
@@ -196,7 +196,7 @@ class NYCEmissionsData:
                             distance = np.sqrt(di**2 + dj**2)
                             if distance <= radius:
                                 falloff = 1.0 - (distance / (radius + 1))
-                                emissions_grid[ni, nj] += hotspot['emissions_kg_km2_day'] * falloff
+                                emissions_grid[ni, nj] += hotspot['emissions_tonne_km2_day'] * falloff
         
         # 3. BOROUGH-BASED BASELINE URBAN EMISSIONS
         print("[REAL-DATA] Adding borough-based urban baseline...")
@@ -207,25 +207,24 @@ class NYCEmissionsData:
                     base_emission = self._calculate_baseline_urban_emission(lat, lon)
                     emissions_grid[i, j] = max(emissions_grid[i, j], base_emission)
         
-        # 4. WATER/PARKS - Minimum emissions (5k-30k kg/km²/day)
+        # 4. WATER/PARKS - Minimum emissions (2.5-15 tonnes/km²/day)
         print("[REAL-DATA] Applying water/park modifiers...")
         for i, lat in enumerate(lats):
             for j, lon in enumerate(lons):
                 if self._is_over_water(lat, lon):
-                    # Water bodies: minimum 10k kg/km²/day (shipping, ferries not fully modeled)
-                    emissions_grid[i, j] = max(10000, emissions_grid[i, j] * 0.05)
-        
+                    # Water bodies: minimum 5 tonnes/km²/day (shipping, ferries not fully modeled)
+                    emissions_grid[i, j] = max(5, emissions_grid[i, j] * 0.05)
+
         # Ensure minimum emissions (parks, low-activity areas)
-        emissions_grid = np.maximum(emissions_grid, 8000)  # 8k kg/km²/day minimum
+        emissions_grid = np.maximum(emissions_grid, 4)  # 4 tonnes/km²/day minimum
         
         # Calculate and report citywide total for verification
-        total_emissions_kg_day = np.sum(emissions_grid * cell_area_km2)
-        total_emissions_tonnes_day = total_emissions_kg_day / 1000
+        total_emissions_tonnes_day = np.sum(emissions_grid * cell_area_km2)
         print(f"[VERIFY] Citywide total: {total_emissions_tonnes_day:,.0f} tonnes/day")
         print(f"[VERIFY] Target range: 100,000-300,000 tonnes/day")
-        print(f"[VERIFY] Average per km²: {np.mean(emissions_grid):,.0f} kg/km²/day")
-        print(f"[VERIFY] Median per km²: {np.median(emissions_grid):,.0f} kg/km²/day")
-        print(f"[VERIFY] Peak per km²: {np.max(emissions_grid):,.0f} kg/km²/day")
+        print(f"[VERIFY] Average per km²: {np.mean(emissions_grid):,.0f} tonnes/km²/day")
+        print(f"[VERIFY] Median per km²: {np.median(emissions_grid):,.0f} tonnes/km²/day")
+        print(f"[VERIFY] Peak per km²: {np.max(emissions_grid):,.0f} tonnes/km²/day")
         
         return emissions_grid
     
@@ -262,32 +261,32 @@ class NYCEmissionsData:
     def _calculate_baseline_urban_emission(self, lat: float, lon: float) -> float:
         """
         Calculate baseline urban emission intensity based on borough proximity
-        Target: Average 80k-150k kg/km²/day for typical urban areas (adjusted for citywide total)
+        Target: Average 40-75 tonnes/km²/day for typical urban areas (adjusted for citywide total)
         """
-        base_emission = 50000  # Base urban emission (50k kg CO₂/km²/day)
-        
+        base_emission = 25  # Base urban emission (25 tonnes CO₂/km²/day)
+
         # Calculate distance to each borough center and apply intensity
         total_intensity = 0
         for borough, data in self.BOROUGHS.items():
             center_lat, center_lon = data['center']
             intensity = data['intensity']
-            
+
             # Euclidean distance (simplified, not geodesic)
             distance = np.sqrt((lat - center_lat)**2 + (lon - center_lon)**2)
-            
+
             # Inverse distance weighting with falloff
             if distance < 0.05:
                 # Very close to borough center: high emissions
-                contribution = intensity * 80000
+                contribution = intensity * 40
             elif distance < 0.15:
                 # Near borough center
-                contribution = intensity * 50000 / (distance * 10 + 1)
+                contribution = intensity * 25 / (distance * 10 + 1)
             else:
                 # Outer areas
-                contribution = intensity * 30000 / (distance * 20 + 1)
-            
+                contribution = intensity * 15 / (distance * 20 + 1)
+
             total_intensity += contribution
-        
+
         return base_emission + total_intensity
     
     def _calculate_emission_at_point(self, lat: float, lon: float) -> float:
@@ -295,44 +294,44 @@ class NYCEmissionsData:
         Calculate emission value at a specific point based on NYC geography
         FALLBACK method for synthetic baseline only
         """
-        base_emission = 100000  # Base urban emission (100k kg CO₂/km²/day)
-        
+        base_emission = 50  # Base urban emission (50 tonnes CO₂/km²/day)
+
         # Calculate distance to each borough center and apply intensity
         total_intensity = 0
         for borough, data in self.BOROUGHS.items():
             center_lat, center_lon = data['center']
             intensity = data['intensity']
-            
+
             # Euclidean distance (simplified, not geodesic)
             distance = np.sqrt((lat - center_lat)**2 + (lon - center_lon)**2)
-            
+
             # Inverse distance weighting with falloff
             if distance < 0.05:
-                contribution = intensity * 150000
+                contribution = intensity * 75
             elif distance < 0.15:
-                contribution = intensity * 100000 / (distance * 10 + 1)
+                contribution = intensity * 50 / (distance * 10 + 1)
             else:
-                contribution = intensity * 50000 / (distance * 20 + 1)
-            
+                contribution = intensity * 25 / (distance * 20 + 1)
+
             total_intensity += contribution
-        
+
         # Add hotspots (airports, industrial areas) - rescaled
         hotspots = [
-            (40.6413, -73.7781, 2000000),  # JFK Airport
-            (40.7769, -73.8740, 1500000),  # LaGuardia Airport
-            (40.7580, -73.9855, 250000),   # Times Square / Midtown
+            (40.6413, -73.7781, 1000),  # JFK Airport
+            (40.7769, -73.8740, 750),   # LaGuardia Airport
+            (40.7580, -73.9855, 125),   # Times Square / Midtown
         ]
-        
+
         for spot_lat, spot_lon, spot_intensity in hotspots:
             distance = np.sqrt((lat - spot_lat)**2 + (lon - spot_lon)**2)
             if distance < 0.05:
                 total_intensity += spot_intensity * np.exp(-distance**2 / 0.001)
-        
+
         # Lower emissions over water
         if self._is_over_water(lat, lon):
             total_intensity *= 0.1
-            base_emission = 10000  # Water minimum
-        
+            base_emission = 5  # Water minimum
+
         return base_emission + total_intensity
     
     def _is_over_water(self, lat: float, lon: float) -> bool:
@@ -502,8 +501,8 @@ class NYCEmissionsData:
             pm25_value = station['value']
             
             # Convert PM2.5 to emission proxy (simplified conversion)
-            # Typical PM2.5: 5-50 Âµg/mÂ³, Emissions: 20-200 kg COâ‚‚/kmÂ²/day
-            emission_proxy = pm25_value * 2.5
+            # Typical PM2.5: 5-50 Âµg/mÂ³, Emissions: 0.02-0.2 tonnes COâ‚‚/kmÂ²/day
+            emission_proxy = pm25_value * 0.0025
             
             # Find nearest grid points and apply influence
             lat_idx = np.argmin(np.abs(lats - lat))
@@ -537,21 +536,21 @@ class NYCEmissionsData:
     
     def apply_intervention(self, intervention: Dict) -> List[Tuple[float, float, float]]:
         """
-        Apply intervention to emissions grid
-        
+        Apply intervention to emissions grid using geographic-specific modifications
+
         Args:
             intervention: Dict with keys:
-                - borough: str or "citywide"
-                - sector: str (transport, buildings, industry)
-                - reduction_percent: float
+                - geographic_modifications: List of modification rules
+                - average_change_percent: float (overall average change)
                 - description: str
+                - spatial_pattern: List of (lat, lon, intensity) tuples
         """
         if self.baseline_cache is None:
             self._generate_baseline()
-        
+
         lats, lons, baseline_emissions = self.baseline_cache
         modified_emissions = baseline_emissions.copy()
-        
+
         # Handle unrelated prompts - no change to emissions
         if intervention.get('is_unrelated'):
             print("[INFO] Unrelated prompt detected - no emissions impact")
@@ -568,106 +567,73 @@ class NYCEmissionsData:
                 for j, lon in enumerate(lons):
                     points.append((lat, lon, baseline_emissions[i, j]))
             return points
-        
-        borough = intervention.get('borough', 'citywide')
-        reduction_value = intervention.get('reduction_percent', intervention.get('magnitude_percent', 0)) / 100.0
-        direction = intervention.get('direction', 'decrease')
-        if direction == 'increase':
-            reduction_value = -reduction_value
-        sector = intervention.get('sector', 'transport')
+
+        geographic_modifications = intervention.get('geographic_modifications', [])
         description = intervention.get('description', '')
-        
-        print(f"[>] Applying intervention: {reduction_value*100}% change in {sector} for {borough}")
-        
-        # Get real emissions data if available
-        real_emissions_data = None
-        if self.data_loader:
-            try:
-                real_emissions_data = self.data_loader.get_emissions_for_sector(sector, intervention)
-                print(f"[DATA] Real emissions calculated:")
-                print(f"       Baseline: {real_emissions_data['baseline_tons_co2']:,.0f} tons CO2/year")
-                print(f"       After intervention: {real_emissions_data['reduced_tons_co2']:,.0f} tons CO2/year")
-                print(f"       Annual savings: {real_emissions_data['annual_savings_tons_co2']:,.0f} tons CO2/year")
-            except Exception as e:
-                print(f"[WARN] Could not calculate real emissions: {e}")
-        
-        # Store real emissions data in intervention for later use
-        if real_emissions_data:
-            intervention['real_emissions'] = real_emissions_data
-        
-        # Sector-specific reduction factors (for grid visualization)
-        sector_factors = {
-            'transport': 0.35,  # Transport is ~35% of urban CO₂
-            'buildings': 0.45,  # Buildings ~45%
-            'industry': 0.20,   # Industry ~20%
-            'energy': 0.30,
-            'nature': 0.10,
-            'aviation': 0.05,  # Aviation ~5%
-            'all': 1.0
-        }
-        
-        sector_factor = sector_factors.get(sector, sector_factors['all'])
-        effective_reduction = reduction_value * sector_factor
-        
-        # Use AI-generated spatial pattern if available
-        if 'spatial_pattern' in intervention:
-            # Apply AI-generated spatial pattern
-            ai_pattern = intervention['spatial_pattern']
-            
-            # Enhance with real facility locations if available
-            if self.data_loader:
-                try:
-                    real_spatial = self.data_loader.get_spatial_data_for_sector(sector, intervention)
-                    if real_spatial:
-                        # Add real facility locations to pattern with high intensity
-                        ai_pattern = list(ai_pattern) + real_spatial
-                        print(f"[DATA] Added {len(real_spatial)} real facility locations")
-                except Exception as e:
-                    print(f"[WARN] Could not add real spatial data: {e}")
-            
-            print(f"[AI] Applying {len(ai_pattern)} spatial points")
-            
-            # Create dramatic spatial variations based on AI pattern
-            for pattern_lat, pattern_lon, pattern_intensity in ai_pattern:
-                # Apply reduction to nearby grid points with distance-based falloff
+
+        print(f"[>] Applying geographic modifications: {len(geographic_modifications)} rules")
+        for mod in geographic_modifications:
+            print(f"    - {mod.get('area', 'Unknown')}: {mod.get('change_percent', 0)}% ({mod.get('type', 'unknown')})")
+
+        # Apply each geographic modification
+        for mod in geographic_modifications:
+            mod_type = mod.get('type')
+            change_percent = mod.get('change_percent', 0) / 100.0  # Convert to decimal
+            area = mod.get('area', 'Unknown')
+
+            if mod_type == 'hotspot':
+                # Apply to specific hotspot location with radius
+                target_lat = mod.get('lat')
+                target_lon = mod.get('lon')
+                radius_km = mod.get('radius_km', 5)
+                radius_deg = radius_km / 111.0  # Approximate conversion to degrees
+
+                print(f"[HOTSPOT] Applying {change_percent*100}% to {area} (radius: {radius_km}km)")
+
                 for i, lat in enumerate(lats):
                     for j, lon in enumerate(lons):
-                        # CRITICAL: Only apply to points within the target borough
-                        if not self._is_in_target_area(lat, lon, borough):
-                            continue
-                            
+                        distance = np.sqrt((lat - target_lat)**2 + (lon - target_lon)**2)
+                        if distance < radius_deg:
+                            # Gaussian falloff from center
+                            intensity = np.exp(-distance**2 / (2 * (radius_deg/2.0)**2))
+                            reduction_factor = 1.0 + (change_percent * intensity)
+                            modified_emissions[i, j] *= max(0.01, reduction_factor)
+
+            elif mod_type == 'borough':
+                # Apply to entire borough
+                print(f"[BOROUGH] Applying {change_percent*100}% to {area}")
+
+                for i, lat in enumerate(lats):
+                    for j, lon in enumerate(lons):
+                        if self._is_in_target_area(lat, lon, area):
+                            reduction_factor = 1.0 + change_percent
+                            modified_emissions[i, j] *= max(0.01, reduction_factor)
+
+            elif mod_type == 'baseline':
+                # Apply to citywide baseline (minimum values)
+                print(f"[BASELINE] Applying {change_percent*100}% to citywide minimum")
+
+                # Only modify low-emission areas (< 20 tonnes/km²/day)
+                for i, lat in enumerate(lats):
+                    for j, lon in enumerate(lons):
+                        if baseline_emissions[i, j] < 20:
+                            reduction_factor = 1.0 + change_percent
+                            modified_emissions[i, j] *= max(0.01, reduction_factor)
+
+        # Apply spatial pattern for visual variation if available
+        if 'spatial_pattern' in intervention:
+            ai_pattern = intervention['spatial_pattern']
+            print(f"[SPATIAL] Applying {len(ai_pattern)} pattern points for visualization")
+
+            for pattern_lat, pattern_lon, pattern_intensity in ai_pattern:
+                for i, lat in enumerate(lats):
+                    for j, lon in enumerate(lons):
                         distance = np.sqrt((lat - pattern_lat)**2 + (lon - pattern_lon)**2)
-                        
-                        # Create larger impact radius (0.08 degrees ≈ 8km) for more visible effects
-                        if distance < 0.08:
-                            # Calculate impact based on distance and intensity
-                            impact_factor = pattern_intensity * (1 - distance * 12)  # Slower falloff
-                            impact_factor = max(0.3, impact_factor)  # Higher minimum impact
-                            
-                            # Apply dramatic reduction based on AI pattern
-                            reduction_factor = 1.0 - (effective_reduction * impact_factor * 3.0)  # 3x multiplier for visibility
-                            modified_emissions[i, j] *= max(0.01, reduction_factor)  # Allow very deep reductions
-                            
-                            # Add deterministic variation based on coordinates for consistency
-                            coord_hash = hash(f"{lat:.3f}_{lon:.3f}_{pattern_lat:.3f}_{pattern_lon:.3f}") % 1000
-                            variation_factor = 0.7 + (coord_hash / 1000.0) * 0.6  # 0.7 to 1.3 range
-                            modified_emissions[i, j] *= variation_factor
-        else:
-            # Fallback to old pattern generation
-            intervention_pattern = self._create_ai_spatial_pattern(
-                lats, lons, borough, sector, description, reduction
-            )
-            
-            # Apply reduction with AI-generated spatial pattern
-            for i, lat in enumerate(lats):
-                for j, lon in enumerate(lons):
-                    if self._is_in_target_area(lat, lon, borough):
-                        # Get AI-calculated spatial intensity for this point
-                        spatial_intensity = intervention_pattern[i, j]
-                        
-                        # Apply reduction scaled by AI spatial intensity
-                        reduction_factor = 1.0 - (effective_reduction * spatial_intensity)
-                        modified_emissions[i, j] *= max(0.05, reduction_factor)  # Keep minimum 5%
+
+                        if distance < 0.05:  # ~5km radius for subtle variations
+                            # Add subtle variation (±10%) based on spatial pattern
+                            variation = 1.0 + (pattern_intensity - 0.5) * 0.2
+                            modified_emissions[i, j] *= variation
         
         # Convert to list of points
         points = []

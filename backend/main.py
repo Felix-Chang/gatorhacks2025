@@ -31,7 +31,7 @@ app.add_middleware(
 
 # Initialize data processor
 emissions_data = NYCEmissionsData()
-ai_processor = AIPromptProcessor(api_key=os.getenv("OPENAI_API_KEY"))
+ai_processor = AIPromptProcessor()  # Uses ANTHROPIC_API_KEY from environment
 
 
 class SimulationRequest(BaseModel):
@@ -90,7 +90,7 @@ async def get_baseline():
         
         metadata = {
             "city": "New York City",
-            "unit": "kg COâ‚‚/kmÂ²/day",
+            "unit": "tonnes COâ‚‚/kmÂ²/day",
             "source": "OpenAQ + Synthetic Grid",
             "bounds": {
                 "south": 40.49,
@@ -135,7 +135,7 @@ async def simulate_intervention(request: SimulationRequest):
         
         metadata = {
             "city": "New York City",
-            "unit": "kg COâ‚‚/kmÂ²/day",
+            "unit": "tonnes COâ‚‚/kmÂ²/day",
             "source": "Simulated",
             "bounds": {
                 "south": 40.49,
@@ -151,7 +151,14 @@ async def simulate_intervention(request: SimulationRequest):
         if 'real_emissions' in intervention:
             statistics = intervention['real_emissions']
             print(f"[API] Including real emissions statistics in response")
-        
+            print(f"[API] Statistics: baseline={statistics.get('baseline_tons_co2')}, reduced={statistics.get('reduced_tons_co2')}, percentage={statistics.get('percentage_reduction')}%")
+
+        # Debug: Log what we're sending to frontend
+        print(f"[API] Sending to frontend:")
+        print(f"      intervention.reduction_percent = {intervention.get('reduction_percent')}")
+        print(f"      intervention.direction = {intervention.get('direction')}")
+        print(f"      statistics.percentage_reduction = {statistics.get('percentage_reduction') if statistics else 'N/A'}")
+
         return {
             "grid": grid_points,
             "intervention": intervention,
