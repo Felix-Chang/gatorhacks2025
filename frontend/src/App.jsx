@@ -335,7 +335,8 @@ function App() {
   const [error, setError] = useState(null)
   const [currentView, setCurrentView] = useState('baseline')
   const [isBackendConnected, setIsBackendConnected] = useState(false)
-  
+  const [baselineAverage, setBaselineAverage] = useState(null)
+
   // Conversation history
   const [conversationHistory, setConversationHistory] = useState([])
   const [activeConversationIndex, setActiveConversationIndex] = useState(null)
@@ -612,6 +613,16 @@ function App() {
     return baseline.reduce((max, point) => (point.value > max ? point.value : max), 0)
   }, [baseline])
 
+  // Store baseline average when baseline data loads
+  useEffect(() => {
+    if (baseline && baseline.length > 0) {
+      const baselineStats = computeStats(baseline)
+      if (baselineStats) {
+        setBaselineAverage(baselineStats.avgValue)
+      }
+    }
+  }, [baseline])
+
   const differenceData = useMemo(() => {
     if (!baseline || !simulation) return null
     return baseline.map((baselinePoint, index) => {
@@ -648,18 +659,20 @@ function App() {
     }
 
     // Use ACTUAL emission values (tonnes CO₂/km²/day) to match legend
-    // NYC inventory-aligned ranges:
-    // Peak Hotspots: >500 (airports, industrial)
-    // Very High: 100-500 (dense Manhattan)
-    // High: 40-100 (urban centers)
-    // Medium: 15-40 (typical urban)
-    // Low: <15 (parks, water, outer areas)
+    // NYC inventory-aligned ranges (6-tier system for better color distribution):
+    // Peak Hotspots: >500 (airports)
+    // High: 150-500 (dense Manhattan commercial)
+    // Medium-High: 85-150 (above average, commercial areas)
+    // Medium: 50-85 (around citywide average ~64.7)
+    // Medium-Low: 25-50 (below average)
+    // Low: <25 (parks, water, outer areas)
 
-    if (value > 500) return 'rgba(127, 29, 29, 0.9)'  // Peak Hotspots
-    if (value > 100) return 'rgba(239, 68, 68, 0.8)'  // Very High
-    if (value > 40) return 'rgba(251, 146, 60, 0.7)'  // High
-    if (value > 15) return 'rgba(250, 204, 21, 0.7)'  // Medium
-    return 'rgba(74, 222, 128, 0.6)'                  // Low
+    if (value > 500) return 'rgba(109, 40, 217, 0.9)'  // Peak Hotspots - Dark Purple
+    if (value > 150) return 'rgba(153, 27, 27, 0.9)'   // High - Very Dark Crimson red
+    if (value > 85) return 'rgba(239, 68, 68, 0.8)'    // Medium-High - Red
+    if (value > 50) return 'rgba(249, 115, 22, 0.7)'   // Medium - Orange
+    if (value > 25) return 'rgba(250, 204, 21, 0.7)'   // Medium-Low - Yellow
+    return 'rgba(34, 197, 94, 0.7)'                    // Low - Green
   }, [])
 
   const examplePrompts = [
@@ -951,68 +964,6 @@ function App() {
       {/* Statistics Grid */}
       {(stats || statistics) && (
         <div className="stats-section fade-in">
-          {intervention && (
-            <div className="stat-card glass">
-              <h3 className="stat-card-title">
-                Intervention Summary
-                {intervention?.confidence_level && (
-                  <span className={`confidence-badge ${intervention.confidence_level}`}>
-                    {intervention.confidence_level} confidence
-                  </span>
-                )}
-              </h3>
-
-              {/* Brief summary */}
-              <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '8px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
-                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>{intervention.description}</p>
-              </div>
-
-              {/* Average change percentage */}
-              {statistics && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Average Emission Change</span>
-                    <span className={`stat-value ${statistics?.is_increase ? 'increase' : 'decrease'}`} style={{ fontSize: '1.5rem', fontWeight: '600' }}>
-                      {statistics?.is_increase ? '+' : '−'}{Math.abs(statistics?.percentage_reduction || 0).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    {statistics?.is_increase
-                      ? `${formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} added per year`
-                      : `${formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} saved per year`
-                    }
-                  </div>
-                </div>
-              )}
-
-              {/* Expandable calculations & analysis */}
-              {intervention.reasoning && (
-                <details style={{ marginTop: '1rem' }}>
-                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
-                    Calculations & Analysis
-                  </summary>
-                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(17, 24, 39, 0.3)', borderRadius: '6px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
-                    {intervention.reasoning}
-                  </div>
-                </details>
-              )}
-
-              {/* Secondary impacts */}
-              {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
-                <details style={{ marginTop: '1rem' }}>
-                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
-                    Secondary Impacts
-                  </summary>
-                  <ul style={{ marginTop: '0.75rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
-                    {intervention.secondary_impacts.map((impact, i) => (
-                      <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          )}
-          
           {stats && (
             <div className="stat-card glass">
               <h3 className="stat-card-title">Grid Statistics</h3>
@@ -1056,6 +1007,68 @@ function App() {
                 <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.75rem', fontStyle: 'italic' }}>
                   {intervention.grid_impact.notes}
                 </p>
+              )}
+            </div>
+          )}
+
+          {intervention && (
+            <div className="stat-card glass">
+              <h3 className="stat-card-title">Intervention Summary</h3>
+
+              {/* Brief summary */}
+              <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '8px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
+                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>{intervention.description}</p>
+              </div>
+
+              {/* Average change percentage - calculated from actual grid data */}
+              {statistics && baselineAverage && stats && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Average Emission Change</span>
+                    {(() => {
+                      // Calculate actual percentage change from grid averages
+                      const percentChange = ((baselineAverage - stats.avgValue) / baselineAverage) * 100
+                      const isIncrease = percentChange < 0
+                      return (
+                        <span className={`stat-value ${isIncrease ? 'increase' : 'decrease'}`} style={{ fontSize: '1.5rem', fontWeight: '600' }}>
+                          {isIncrease ? '+' : '−'}{Math.abs(percentChange).toFixed(1)}%
+                        </span>
+                      )
+                    })()}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    {statistics?.is_increase
+                      ? `${formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} added per year`
+                      : `${formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} saved per year`
+                    }
+                  </div>
+                </div>
+              )}
+
+              {/* Expandable calculations & analysis */}
+              {intervention.reasoning && (
+                <details style={{ marginTop: '1rem' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
+                    Calculations & Analysis
+                  </summary>
+                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(17, 24, 39, 0.3)', borderRadius: '6px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                    {intervention.reasoning}
+                  </div>
+                </details>
+              )}
+
+              {/* Secondary impacts */}
+              {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
+                <details style={{ marginTop: '1rem' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
+                    Secondary Impacts
+                  </summary>
+                  <ul style={{ marginTop: '0.75rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                    {intervention.secondary_impacts.map((impact, i) => (
+                      <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
+                    ))}
+                  </ul>
+                </details>
               )}
             </div>
           )}
