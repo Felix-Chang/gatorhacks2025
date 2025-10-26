@@ -95,13 +95,15 @@ export function formatAnnualEmissions(tons, unit = 'metric', abbreviated = true)
  */
 export function getLegendRanges(unit = 'metric') {
   // NYC inventory-aligned ranges (tonnes CO₂/km²/day)
-  // Peak hotspots: 500-2.5k | High urban: 100-150 | Median: 20-60 | Min: 2.5-15
+  // Adjusted for better color distribution - more yellow/orange in middle
+  // Citywide average: ~64.7 | Manhattan: 100-150 | Airports: 1,000-1,500
   const metricRanges = [
-    { min: 500, max: Infinity, label: 'Peak Hotspots', color: 'rgba(127, 29, 29, 0.9)' },
-    { min: 100, max: 500, label: 'Very High', color: 'rgba(239, 68, 68, 0.8)' },
-    { min: 40, max: 100, label: 'High', color: 'rgba(251, 146, 60, 0.7)' },
-    { min: 15, max: 40, label: 'Medium', color: 'rgba(250, 204, 21, 0.7)' },
-    { min: 0, max: 15, label: 'Low', color: 'rgba(74, 222, 128, 0.6)' },
+    { min: 500, max: Infinity, label: 'Peak Hotspots', color: 'rgba(109, 40, 217, 0.9)' }, // Dark Purple
+    { min: 150, max: 500, label: 'High', color: 'rgba(153, 27, 27, 0.9)' }, // Very Dark Crimson red
+    { min: 85, max: 150, label: 'Medium-High', color: 'rgba(239, 68, 68, 0.8)' }, // Red
+    { min: 50, max: 85, label: 'Medium', color: 'rgba(249, 115, 22, 0.7)' }, // Orange
+    { min: 25, max: 50, label: 'Medium-Low', color: 'rgba(250, 204, 21, 0.7)' }, // Yellow
+    { min: 0, max: 25, label: 'Low', color: 'rgba(34, 197, 94, 0.7)' }, // Green
   ];
   
   if (unit === 'imperial') {
@@ -149,11 +151,13 @@ export function getMarkerColor(value, view, unit = 'metric') {
 
   // Emission intensity colors (NYC inventory-aligned)
   // Always use metric thresholds internally (tonnes CO₂/km²/day)
-  if (value > 500) return 'rgba(127, 29, 29, 0.9)';  // Peak Hotspots (airports)
-  if (value > 100) return 'rgba(239, 68, 68, 0.8)';  // Very High (dense Manhattan)
-  if (value > 40) return 'rgba(251, 146, 60, 0.7)';  // High (urban centers)
-  if (value > 15) return 'rgba(250, 204, 21, 0.7)';  // Medium (typical urban)
-  return 'rgba(74, 222, 128, 0.6)';                  // Low (parks, water, outer areas)
+  // 6-tier system for better color distribution
+  if (value > 500) return 'rgba(109, 40, 217, 0.9)';  // Peak Hotspots - Dark Purple
+  if (value > 150) return 'rgba(153, 27, 27, 0.9)';   // High - Very Dark Crimson red
+  if (value > 85) return 'rgba(239, 68, 68, 0.8)';    // Medium-High - Red
+  if (value > 50) return 'rgba(249, 115, 22, 0.7)';   // Medium - Orange
+  if (value > 25) return 'rgba(250, 204, 21, 0.7)';   // Medium-Low - Yellow
+  return 'rgba(34, 197, 94, 0.7)';                    // Low - Green
 }
 
 /**

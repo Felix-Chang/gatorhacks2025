@@ -136,13 +136,13 @@ const EmissionsMap = memo(function EmissionsMap({ data, view, getMarkerColor, un
                 {view === 'difference' ? (
                   <>
                     <p>
-                      <strong>Reduction:</strong> <span className="highlight">{point.value.toFixed(1)}%</span>
+                      <strong>Emissions:</strong> <span className="highlight">{point.simulationValue ? formatEmissionIntensity(point.simulationValue, unitSystem) : '—'}</span>
                     </p>
                     <p>
+                      <strong>Reduction:</strong> {point.value.toFixed(1)}%
+                    </p>
+                    <p style={{ fontSize: '0.85em', opacity: 0.8 }}>
                       <strong>Before:</strong> {point.baselineValue ? formatEmissionIntensity(point.baselineValue, unitSystem) : '—'}
-                    </p>
-                    <p>
-                      <strong>After:</strong> {point.simulationValue ? formatEmissionIntensity(point.simulationValue, unitSystem) : '—'}
                     </p>
                   </>
                 ) : (
@@ -335,7 +335,8 @@ function App() {
   const [error, setError] = useState(null)
   const [currentView, setCurrentView] = useState('baseline')
   const [isBackendConnected, setIsBackendConnected] = useState(false)
-  
+  const [baselineAverage, setBaselineAverage] = useState(null)
+
   // Conversation history
   const [conversationHistory, setConversationHistory] = useState([])
   const [activeConversationIndex, setActiveConversationIndex] = useState(null)
@@ -612,6 +613,16 @@ function App() {
     return baseline.reduce((max, point) => (point.value > max ? point.value : max), 0)
   }, [baseline])
 
+  // Store baseline average when baseline data loads
+  useEffect(() => {
+    if (baseline && baseline.length > 0) {
+      const baselineStats = computeStats(baseline)
+      if (baselineStats) {
+        setBaselineAverage(baselineStats.avgValue)
+      }
+    }
+  }, [baseline])
+
   const differenceData = useMemo(() => {
     if (!baseline || !simulation) return null
     return baseline.map((baselinePoint, index) => {
@@ -638,28 +649,39 @@ function App() {
 
   const stats = useMemo(() => computeStats(mapData), [mapData])
 
+  // For Grid Statistics display: use appropriate data based on view
+  const displayStats = useMemo(() => {
+    if (currentView === 'baseline') {
+      return computeStats(baseline)
+    } else if ((currentView === 'simulation' || currentView === 'difference') && simulation) {
+      return computeStats(simulation)
+    }
+    return stats
+  }, [currentView, baseline, simulation, stats])
+
   const getMarkerColor = useCallback((value, view) => {
     if (view === 'difference') {
-      if (value > 50) return '#10b981'
-      if (value > 25) return '#84cc16'
-      if (value > 10) return '#facc15'
-      if (value > 0) return '#f97316'
-      return '#ef4444'
+      if (value > 25) return '#10b981'  // High - Darker green
+      if (value > 10) return '#86efac'  // Medium - Light green
+      if (value > 0) return '#fde047'   // Low - Yellow
+      return '#fb923c'                  // No Significant Reduction - Orange
     }
 
     // Use ACTUAL emission values (tonnes CO₂/km²/day) to match legend
-    // NYC inventory-aligned ranges:
-    // Peak Hotspots: >500 (airports, industrial)
-    // Very High: 100-500 (dense Manhattan)
-    // High: 40-100 (urban centers)
-    // Medium: 15-40 (typical urban)
-    // Low: <15 (parks, water, outer areas)
+    // NYC inventory-aligned ranges (6-tier system for better color distribution):
+    // Peak Hotspots: >500 (airports)
+    // High: 150-500 (dense Manhattan commercial)
+    // Medium-High: 85-150 (above average, commercial areas)
+    // Medium: 50-85 (around citywide average ~64.7)
+    // Medium-Low: 25-50 (below average)
+    // Low: <25 (parks, water, outer areas)
 
-    if (value > 500) return 'rgba(127, 29, 29, 0.9)'  // Peak Hotspots
-    if (value > 100) return 'rgba(239, 68, 68, 0.8)'  // Very High
-    if (value > 40) return 'rgba(251, 146, 60, 0.7)'  // High
-    if (value > 15) return 'rgba(250, 204, 21, 0.7)'  // Medium
-    return 'rgba(74, 222, 128, 0.6)'                  // Low
+    if (value > 500) return 'rgba(109, 40, 217, 0.9)'  // Peak Hotspots - Dark Purple
+    if (value > 150) return 'rgba(153, 27, 27, 0.9)'   // High - Very Dark Crimson red
+    if (value > 85) return 'rgba(239, 68, 68, 0.8)'    // Medium-High - Red
+    if (value > 50) return 'rgba(249, 115, 22, 0.7)'   // Medium - Orange
+    if (value > 25) return 'rgba(250, 204, 21, 0.7)'   // Medium-Low - Yellow
+    return 'rgba(34, 197, 94, 0.7)'                    // Low - Green
   }, [])
 
   const examplePrompts = [
@@ -913,23 +935,19 @@ function App() {
                 <>
                   <div className="legend-item">
                     <div className="legend-color" style={{background: '#10b981'}}></div>
-                    <span>High Reduction (&gt;50%)</span>
+                    <span>High (&gt;25%)</span>
                   </div>
                   <div className="legend-item">
-                    <div className="legend-color" style={{background: '#84cc16'}}></div>
-                    <span>Medium-High (25-50%)</span>
-                  </div>
-                  <div className="legend-item">
-                    <div className="legend-color" style={{background: '#facc15'}}></div>
+                    <div className="legend-color" style={{background: '#86efac'}}></div>
                     <span>Medium (10-25%)</span>
                   </div>
                   <div className="legend-item">
-                    <div className="legend-color" style={{background: '#f97316'}}></div>
+                    <div className="legend-color" style={{background: '#fde047'}}></div>
                     <span>Low (0-10%)</span>
                   </div>
                   <div className="legend-item">
-                    <div className="legend-color" style={{background: '#ef4444'}}></div>
-                    <span>No Reduction</span>
+                    <div className="legend-color" style={{background: '#fb923c'}}></div>
+                    <span>No Significant Reduction</span>
                   </div>
                 </>
               ) : (
@@ -949,32 +967,79 @@ function App() {
       </div>
 
       {/* Statistics Grid */}
-      {(stats || statistics) && (
+      {(displayStats || statistics) && (
         <div className="stats-section fade-in">
+          {displayStats && (
+            <div className="stat-card glass">
+              <h3 className="stat-card-title">Grid Statistics</h3>
+              <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '1rem', lineHeight: '1.4' }}>
+                Coverage: ~{unitSystem === 'imperial' ? '868 mi²' : '2,249 km²'} grid (NYC + water bodies). Values are emission intensities ({unitSystem === 'imperial' ? 'tons CO₂/mi²/day' : 'tonnes CO₂/km²/day'}).
+                Aligned with NYC GHG inventory benchmarks.
+              </p>
+              <div className="stat-grid" style={{ gridTemplateColumns: intervention?.grid_impact?.affected_area_km2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)' }}>
+                <div className="stat-item">
+                  <span className="stat-label">
+                    Average per {unitSystem === 'imperial' ? 'mi²' : 'km²'}
+                    {intervention?.grid_impact && (
+                      <span className="stat-sublabel"> (Baseline)</span>
+                    )}
+                  </span>
+                  <span className="stat-value">{formatEmissionIntensity((displayStats?.avgValue) || 0, unitSystem)}</span>
+                  {intervention?.grid_impact && (
+                    <>
+                      <span className="stat-sublabel">After Intervention</span>
+                      <span className="stat-value-secondary">
+                        {formatEmissionIntensity(intervention.grid_impact.reduced_avg_intensity || 0, unitSystem)}
+                        <span className={`stat-change ${intervention.grid_impact.avg_change_percent < 0 ? 'increase' : 'decrease'}`}>
+                          {intervention.grid_impact.avg_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.avg_change_percent || 0).toFixed(1)}%
+                        </span>
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="stat-item">
+                  <span className="stat-label">Data Points</span>
+                  <span className="stat-value">{displayStats?.dataPoints?.toLocaleString() || '0'}</span>
+                </div>
+                {intervention?.grid_impact?.affected_area_km2 && (
+                  <div className="stat-item">
+                    <span className="stat-label">Affected Area</span>
+                    <span className="stat-value">{intervention.grid_impact.affected_area_km2.toFixed(1)} km²</span>
+                  </div>
+                )}
+              </div>
+              {intervention?.grid_impact?.notes && (
+                <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.75rem', fontStyle: 'italic' }}>
+                  {intervention.grid_impact.notes}
+                </p>
+              )}
+            </div>
+          )}
+
           {intervention && (
             <div className="stat-card glass">
-              <h3 className="stat-card-title">
-                Intervention Summary
-                {intervention?.confidence_level && (
-                  <span className={`confidence-badge ${intervention.confidence_level}`}>
-                    {intervention.confidence_level} confidence
-                  </span>
-                )}
-              </h3>
+              <h3 className="stat-card-title">Intervention Summary</h3>
 
               {/* Brief summary */}
               <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '8px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
                 <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>{intervention.description}</p>
               </div>
 
-              {/* Average change percentage */}
-              {statistics && (
+              {/* Average change percentage - calculated from actual grid data */}
+              {statistics && baselineAverage && displayStats && (
                 <div style={{ marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                     <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Average Emission Change</span>
-                    <span className={`stat-value ${statistics?.is_increase ? 'increase' : 'decrease'}`} style={{ fontSize: '1.5rem', fontWeight: '600' }}>
-                      {statistics?.is_increase ? '+' : '−'}{Math.abs(statistics?.percentage_reduction || 0).toFixed(1)}%
-                    </span>
+                    {(() => {
+                      // Calculate actual percentage change from grid averages
+                      const percentChange = ((baselineAverage - displayStats.avgValue) / baselineAverage) * 100
+                      const isIncrease = percentChange < 0
+                      return (
+                        <span className={`stat-value ${isIncrease ? 'increase' : 'decrease'}`} style={{ fontSize: '1.5rem', fontWeight: '600' }}>
+                          {isIncrease ? '+' : '−'}{Math.abs(percentChange).toFixed(1)}%
+                        </span>
+                      )
+                    })()}
                   </div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
                     {statistics?.is_increase
@@ -994,68 +1059,21 @@ function App() {
                   <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(17, 24, 39, 0.3)', borderRadius: '6px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
                     {intervention.reasoning}
                   </div>
-                </details>
-              )}
 
-              {/* Secondary impacts */}
-              {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
-                <details style={{ marginTop: '1rem' }}>
-                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
-                    Secondary Impacts
-                  </summary>
-                  <ul style={{ marginTop: '0.75rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
-                    {intervention.secondary_impacts.map((impact, i) => (
-                      <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          )}
-          
-          {stats && (
-            <div className="stat-card glass">
-              <h3 className="stat-card-title">Grid Statistics</h3>
-              <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '1rem', lineHeight: '1.4' }}>
-                Coverage: ~{unitSystem === 'imperial' ? '868 mi²' : '2,249 km²'} grid (NYC + water bodies). Values are emission intensities ({unitSystem === 'imperial' ? 'tons CO₂/mi²/day' : 'tonnes CO₂/km²/day'}).
-                Aligned with NYC GHG inventory benchmarks.
-              </p>
-              <div className="stat-grid" style={{ gridTemplateColumns: intervention?.grid_impact?.affected_area_km2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)' }}>
-                <div className="stat-item">
-                  <span className="stat-label">
-                    Average per {unitSystem === 'imperial' ? 'mi²' : 'km²'}
-                    {intervention?.grid_impact && (
-                      <span className="stat-sublabel"> (Baseline)</span>
-                    )}
-                  </span>
-                  <span className="stat-value">{formatEmissionIntensity((stats?.avgValue) || 0, unitSystem)}</span>
-                  {intervention?.grid_impact && (
-                    <>
-                      <span className="stat-sublabel">After Intervention</span>
-                      <span className="stat-value-secondary">
-                        {formatEmissionIntensity(intervention.grid_impact.reduced_avg_intensity || 0, unitSystem)}
-                        <span className={`stat-change ${intervention.grid_impact.avg_change_percent < 0 ? 'increase' : 'decrease'}`}>
-                          {intervention.grid_impact.avg_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.avg_change_percent || 0).toFixed(1)}%
-                        </span>
-                      </span>
-                    </>
+                  {/* Secondary impacts inside calculations section */}
+                  {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                        Secondary Impacts
+                      </h4>
+                      <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                        {intervention.secondary_impacts.map((impact, i) => (
+                          <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
-                </div>
-                <div className="stat-item">
-                  <span className="stat-label">Data Points</span>
-                  <span className="stat-value">{stats?.dataPoints?.toLocaleString() || '0'}</span>
-                </div>
-                {intervention?.grid_impact?.affected_area_km2 && (
-                  <div className="stat-item">
-                    <span className="stat-label">Affected Area</span>
-                    <span className="stat-value">{intervention.grid_impact.affected_area_km2.toFixed(1)} km²</span>
-                  </div>
-                )}
-              </div>
-              {intervention?.grid_impact?.notes && (
-                <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.75rem', fontStyle: 'italic' }}>
-                  {intervention.grid_impact.notes}
-                </p>
+                </details>
               )}
             </div>
           )}
