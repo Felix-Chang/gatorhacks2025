@@ -1067,160 +1067,289 @@ function App() {
       {(displayStats || statistics) && (
         <div className="stats-section fade-in">
           {displayStats && (
-            <div className="stat-card glass">
-              <h3 className="stat-card-title">Grid Statistics</h3>
-              <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '1rem', lineHeight: '1.4' }}>
-                {baselineMetadata ? (
-                  <>
-                    Coverage: ~{unitSystem === 'imperial' 
-                      ? `${Math.round(baselineMetadata.coverage_area_km2 * 0.386102)} mi²` 
-                      : `${Math.round(baselineMetadata.coverage_area_km2)} km²`} (NYC boundaries).{' '}
-                    {baselineMetadata.datapoints.toLocaleString()} datapoints, each ~{baselineMetadata.cell_area_km2.toFixed(2)} km².{' '}
-                    Calibrated to NYC GHG inventory (~{
-                      unitSystem === 'imperial'
-                        ? `${((baselineMetadata.annual_emissions_tonnes * 1.10231131) / 1_000_000).toFixed(1)}M tons/year`
-                        : `${(baselineMetadata.annual_emissions_tonnes / 1_000_000).toFixed(1)}M tonnes/year`
-                    }).
-                  </>
-                ) : (
-                  <>
-                    Calibrated to NYC GHG inventory benchmarks.
-                  </>
-                )}
-              </p>
-              <div className="stat-grid" style={{ gridTemplateColumns: intervention?.grid_impact?.affected_area_km2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)' }}>
-                <div className="stat-item">
-                  <span className="stat-label" style={{ fontSize: '0.9rem', fontWeight: '600' }}>
-                    Average Intensity (per {unitSystem === 'imperial' ? 'mi²' : 'km²'}/day)
-                    {intervention?.grid_impact && (
-                      <span className="stat-sublabel"> (Baseline)</span>
-                    )}
-                  </span>
-                  <span className="stat-value" style={{ fontSize: '1.2rem', fontWeight: '700' }}>{formatEmissionIntensity((displayStats?.avgValue) || 0, unitSystem)}</span>
-                  {intervention?.grid_impact && (
+            <div className="stat-card glass" style={{ 
+              background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.95) 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: '0 4px 24px rgba(0, 0, 0, 0.2)'
+            }}>
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 className="stat-card-title" style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: '700',
+                  marginBottom: '1rem',
+                  color: 'rgba(255, 255, 255, 0.95)'
+                }}>
+                  Grid Statistics
+                </h3>
+                <div style={{ 
+                  padding: '0.875rem 1.125rem', 
+                  background: 'rgba(99, 102, 241, 0.08)', 
+                  borderRadius: '8px',
+                  border: '1px solid rgba(99, 102, 241, 0.15)',
+                  fontSize: '0.9rem',
+                  lineHeight: '1.7',
+                  color: 'rgba(255, 255, 255, 0.8)'
+                }}>
+                  {baselineMetadata ? (
                     <>
-                      <span className="stat-sublabel">After Intervention</span>
-                      <span className="stat-value-secondary">
-                        {formatEmissionIntensity(intervention.grid_impact.reduced_avg_intensity || 0, unitSystem)}
-                        <span className={`stat-change ${intervention.grid_impact.avg_change_percent < 0 ? 'increase' : 'decrease'}`}>
-                          {intervention.grid_impact.avg_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.avg_change_percent || 0).toFixed(1)}%
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <strong style={{ color: 'rgba(255, 255, 255, 0.9)' }}>Coverage:</strong>
+                          {unitSystem === 'imperial' 
+                            ? `${Math.round(baselineMetadata.coverage_area_km2 * 0.386102)} mi²` 
+                            : `${Math.round(baselineMetadata.coverage_area_km2)} km²`}
                         </span>
-                      </span>
+                        <span style={{ opacity: 0.5 }}>•</span>
+                        <span>
+                          <strong style={{ color: 'rgba(255, 255, 255, 0.9)' }}>{baselineMetadata.datapoints.toLocaleString()}</strong> datapoints
+                        </span>
+                        <span style={{ opacity: 0.5 }}>•</span>
+                        <span>
+                          <strong style={{ color: 'rgba(255, 255, 255, 0.9)' }}>{baselineMetadata.cell_area_km2.toFixed(2)} km²</strong> per cell
+                        </span>
+                      </div>
+                      <div style={{ marginTop: '0.5rem', fontSize: '0.8rem', opacity: 0.8 }}>
+                        Calibrated to NYC GHG inventory ({
+                          unitSystem === 'imperial'
+                            ? `${((baselineMetadata.annual_emissions_tonnes * 1.10231131) / 1_000_000).toFixed(1)}M tons/year`
+                            : `${(baselineMetadata.annual_emissions_tonnes / 1_000_000).toFixed(1)}M tonnes/year`
+                        })
+                      </div>
                     </>
+                  ) : (
+                    'Calibrated to NYC GHG inventory benchmarks'
                   )}
                 </div>
-                <div className="stat-item">
-                  <span className="stat-label" style={{ fontSize: '0.9rem', fontWeight: '600' }}>Data Points</span>
-                  <span className="stat-value" style={{ fontSize: '1.2rem', fontWeight: '700' }}>{displayStats?.dataPoints?.toLocaleString() || '0'}</span>
+              </div>
+
+              {/* Use flex layout for better sizing control */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Top Row: Average Intensity and Data Points */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                  {/* Average Intensity */}
+                  <div style={{ 
+                    padding: '1.25rem', 
+                    background: 'rgba(17, 24, 39, 0.6)', 
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                      Average Intensity
+                    </div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: '700', color: 'rgba(255, 255, 255, 0.95)', marginBottom: '0.35rem' }}>
+                      {formatEmissionIntensity((displayStats?.avgValue) || 0, unitSystem)}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)' }}>
+                      per {unitSystem === 'imperial' ? 'mi²' : 'km²'}/day
+                    </div>
+                    {intervention?.grid_impact && (
+                      <div style={{ marginTop: '0.875rem', paddingTop: '0.875rem', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'rgba(255, 255, 255, 0.5)', marginBottom: '0.5rem' }}>
+                          After Intervention
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '1.25rem', fontWeight: '600', color: 'rgba(255, 255, 255, 0.85)' }}>
+                            {formatEmissionIntensity(intervention.grid_impact.reduced_avg_intensity || 0, unitSystem)}
+                          </span>
+                          <span className={`stat-change ${intervention.grid_impact.avg_change_percent < 0 ? 'increase' : 'decrease'}`} style={{ fontSize: '0.85rem' }}>
+                            {intervention.grid_impact.avg_change_percent > 0 ? '−' : '+'}{Math.abs(intervention.grid_impact.avg_change_percent || 0).toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Data Points */}
+                  <div style={{ 
+                    padding: '1.25rem', 
+                    background: 'rgba(17, 24, 39, 0.6)', 
+                    borderRadius: '10px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                      Data Points
+                    </div>
+                    <div style={{ fontSize: '1.75rem', fontWeight: '700', color: 'rgba(255, 255, 255, 0.95)' }}>
+                      {displayStats?.dataPoints?.toLocaleString() || '0'}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)', marginTop: '0.35rem' }}>
+                      within NYC boundaries
+                    </div>
+                  </div>
                 </div>
+
+                {/* Bottom Row: Total Citywide - Full Width */}
                 {baselineMetadata && (
-                  <div className="stat-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gridColumn: '1 / -1' }}>
-                    <span className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', fontSize: '0.95rem', fontWeight: '600' }}>
-                      <span>Total Citywide</span>
-                      <select 
-                        value={gridStatsTimePeriod} 
-                        onChange={handleGridStatsTimePeriodChange} 
-                        style={{ 
-                          fontSize: '0.7rem', 
-                          padding: '0.15rem 0.3rem', 
-                          borderRadius: '4px',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          background: 'rgba(17, 24, 39, 0.8)',
-                          color: 'rgba(255, 255, 255, 0.9)',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <option value="daily" style={{ background: '#1f2937', color: '#fff' }}>Daily</option>
-                        <option value="annual" style={{ background: '#1f2937', color: '#fff' }}>Annual</option>
-                      </select>
-                      {currentView === 'simulation' && (
-                        <span className="stat-sublabel"> (Baseline)</span>
-                      )}
-                    </span>
-                    <span className="stat-value" style={{ fontSize: '1.3rem', fontWeight: '700', marginTop: '0.4rem' }}>
-                      {formatEmissionsWithPeriod(
-                        baselineMetadata.annual_emissions_tonnes || 0,
-                        unitSystem,
-                        gridStatsTimePeriod,
-                        true
-                      )}
-                    </span>
-                    {currentView === 'simulation' && baselineAverage && displayStats && (
-                      <>
-                        <span className="stat-sublabel" style={{ fontSize: '0.85rem', marginTop: '0.6rem' }}>After Intervention</span>
-                        <span className="stat-value-secondary" style={{ fontSize: '1.15rem', fontWeight: '600', marginTop: '0.2rem' }}>
+                  <div style={{ 
+                    padding: '1.25rem', 
+                    background: 'rgba(99, 102, 241, 0.12)', 
+                    borderRadius: '10px',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    position: 'relative'
+                  }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: '600', color: 'rgba(255, 255, 255, 0.6)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.75rem' }}>
+                      Total Citywide Emissions
+                    </div>
+                    <select 
+                      value={gridStatsTimePeriod} 
+                      onChange={handleGridStatsTimePeriodChange} 
+                      style={{ 
+                        position: 'absolute',
+                        top: '1.25rem',
+                        right: '1.25rem',
+                        fontSize: '0.8rem',
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(99, 102, 241, 0.4)',
+                        background: 'rgba(17, 24, 39, 0.9)',
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => e.target.style.background = 'rgba(99, 102, 241, 0.3)'}
+                      onMouseLeave={(e) => e.target.style.background = 'rgba(17, 24, 39, 0.9)'}
+                    >
+                      <option value="daily" style={{ background: '#1f2937', color: '#fff' }}>Daily</option>
+                      <option value="annual" style={{ background: '#1f2937', color: '#fff' }}>Annual</option>
+                    </select>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: currentView === 'simulation' && baselineAverage && displayStats ? '1fr 1fr' : '1fr', gap: '1.5rem' }}>
+                      <div>
+                        <div style={{ fontSize: '1.75rem', fontWeight: '700', color: 'rgba(255, 255, 255, 0.95)', marginBottom: '0.35rem' }}>
+                          {formatEmissionsWithPeriod(
+                            baselineMetadata.annual_emissions_tonnes || 0,
+                            unitSystem,
+                            gridStatsTimePeriod,
+                            true
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)' }}>
+                          {currentView === 'simulation' ? 'Baseline' : 'Current'}
+                        </div>
+                      </div>
+
+                      {currentView === 'simulation' && baselineAverage && displayStats && (
+                        <div style={{ borderLeft: '1px solid rgba(255, 255, 255, 0.1)', paddingLeft: '1.5rem' }}>
                           {(() => {
                             const percentChange = ((baselineAverage - displayStats.avgValue) / baselineAverage) * 100
                             const simulatedTotal = baselineMetadata.annual_emissions_tonnes * (1 - percentChange / 100)
-                            return formatEmissionsWithPeriod(
-                              simulatedTotal,
-                              unitSystem,
-                              gridStatsTimePeriod,
-                              true
+                            const isIncrease = percentChange < 0 // negative percentChange means emissions went up
+                            
+                            return (
+                              <>
+                                <div style={{ 
+                                  fontSize: '1.75rem', 
+                                  fontWeight: '700', 
+                                  color: isIncrease ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)', // Red if increase, green if decrease
+                                  marginBottom: '0.35rem'
+                                }}>
+                                  {formatEmissionsWithPeriod(
+                                    simulatedTotal,
+                                    unitSystem,
+                                    gridStatsTimePeriod,
+                                    true
+                                  )}
+                                </div>
+                                <div style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.5)' }}>
+                                  After Intervention
+                                </div>
+                              </>
                             )
                           })()}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                )}
-                {intervention?.grid_impact?.affected_area_km2 && (
-                  <div className="stat-item">
-                    <span className="stat-label">Affected Area</span>
-                    <span className="stat-value">{
-                      unitSystem === 'imperial' 
-                        ? `${(intervention.grid_impact.affected_area_km2 * 0.386102).toFixed(1)} mi²`
-                        : `${intervention.grid_impact.affected_area_km2.toFixed(1)} km²`
-                    }</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
-              {intervention?.grid_impact?.notes && (
-                <p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '0.75rem', fontStyle: 'italic' }}>
-                  {intervention.grid_impact.notes}
-                </p>
-              )}
             </div>
           )}
 
           {intervention && (
-            <div className="stat-card glass">
-              <h3 className="stat-card-title">Intervention Summary</h3>
+            <div className="stat-card glass" style={{ background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.95) 0%, rgba(31, 41, 55, 0.95) 100%)', border: '1px solid rgba(99, 102, 241, 0.3)', boxShadow: '0 8px 32px 0 rgba(99, 102, 241, 0.15)' }}>
+              <h3 className="stat-card-title" style={{ marginBottom: '1rem', fontSize: '1.5rem', fontWeight: '700' }}>
+                Intervention Summary
+              </h3>
 
-              {/* Brief summary */}
-              <div style={{ marginBottom: '0.85rem', padding: '0.65rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '8px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
-                <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.5', fontWeight: '500' }}>{intervention.description}</p>
+              {/* Description card */}
+              <div style={{ 
+                marginBottom: '1.5rem', 
+                padding: '1rem', 
+                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%)', 
+                borderRadius: '12px', 
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                boxShadow: '0 4px 12px rgba(99, 102, 241, 0.1)'
+              }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.7', fontWeight: '500', color: 'rgba(255, 255, 255, 0.9)' }}>
+                  {intervention.description}
+                </p>
               </div>
 
-              {/* Average change percentage - calculated from actual grid data */}
+              {/* Impact display */}
               {baselineAverage && simulationStats && baselineMetadata && (
-                <div style={{ marginBottom: '0.85rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Overall Citywide Impact</span>
+                <div style={{ 
+                  marginBottom: '1.5rem',
+                  padding: '1rem',
+                  background: 'rgba(17, 24, 39, 0.6)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
+                  <div style={{ marginBottom: '0.75rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.7)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Overall Citywide Impact
+                    </span>
+                  </div>
+                  
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '1rem' }}>
                     {(() => {
-                      // Calculate actual percentage change from grid averages (always baseline vs simulation)
                       const percentChange = ((baselineAverage - simulationStats.avgValue) / baselineAverage) * 100
                       const absPercent = Math.abs(percentChange)
-                      const isZero = absPercent < 0.05 // Treat anything < 0.05% as 0
+                      const isZero = absPercent < 0.05
                       const isIncrease = percentChange < 0
                       
                       if (isZero) {
                         return (
-                          <span className="stat-value" style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--text-muted)' }}>
+                          <span className="stat-value" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'rgba(255, 255, 255, 0.5)', lineHeight: '1' }}>
                             0.0%
                           </span>
                         )
                       }
                       
                       return (
-                        <span className={`stat-value ${isIncrease ? 'increase' : 'decrease'}`} style={{ fontSize: '1.35rem', fontWeight: '700' }}>
-                          {isIncrease ? '+' : '−'}{absPercent.toFixed(1)}%
-                        </span>
+                        <>
+                          <span className={`stat-value ${isIncrease ? 'increase' : 'decrease'}`} style={{ 
+                            fontSize: '2.5rem', 
+                            fontWeight: '800', 
+                            lineHeight: '1',
+                            textShadow: isIncrease ? '0 0 20px rgba(239, 68, 68, 0.5)' : '0 0 20px rgba(34, 197, 94, 0.5)'
+                          }}>
+                            {isIncrease ? '+' : '−'}{absPercent.toFixed(1)}%
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.35rem 0.7rem', background: isIncrease ? 'rgba(239, 68, 68, 0.15)' : 'rgba(34, 197, 94, 0.15)', borderRadius: '20px', border: isIncrease ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(34, 197, 94, 0.3)' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isIncrease ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)'} strokeWidth="3">
+                              <path d={isIncrease ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}/>
+                            </svg>
+                            <span style={{ fontSize: '0.75rem', fontWeight: '700', color: isIncrease ? 'rgb(239, 68, 68)' : 'rgb(34, 197, 94)' }}>
+                              {isIncrease ? 'INCREASE' : 'DECREASE'}
+                            </span>
+                          </div>
+                        </>
                       )
                     })()}
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontWeight: '500' }}>
-                    <span>
+
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    gap: '1rem', 
+                    padding: '0.875rem 1rem',
+                    background: 'rgba(99, 102, 241, 0.1)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(99, 102, 241, 0.2)'
+                  }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'rgba(255, 255, 255, 0.9)' }}>
                       {(() => {
                         const percentChange = ((baselineAverage - simulationStats.avgValue) / baselineAverage) * 100
                         const actualSavings = baselineMetadata.annual_emissions_tonnes * (percentChange / 100)
@@ -1234,14 +1363,18 @@ function App() {
                       value={intervSummaryTimePeriod} 
                       onChange={handleIntervSummaryTimePeriodChange} 
                       style={{ 
-                        fontSize: '0.65rem', 
-                        padding: '0.15rem 0.3rem', 
-                        borderRadius: '4px',
-                        border: '1px solid rgba(255,255,255,0.3)',
-                        background: 'rgba(17, 24, 39, 0.8)',
+                        fontSize: '0.8rem',
+                        padding: '0.4rem 0.75rem',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(99, 102, 241, 0.4)',
+                        background: 'rgba(17, 24, 39, 0.9)',
                         color: 'rgba(255, 255, 255, 0.9)',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.2s ease'
                       }}
+                      onMouseEnter={(e) => e.target.style.background = 'rgba(99, 102, 241, 0.2)'}
+                      onMouseLeave={(e) => e.target.style.background = 'rgba(17, 24, 39, 0.9)'}
                     >
                       <option value="daily" style={{ background: '#1f2937', color: '#fff' }}>Daily</option>
                       <option value="annual" style={{ background: '#1f2937', color: '#fff' }}>Annual</option>
@@ -1250,34 +1383,86 @@ function App() {
                 </div>
               )}
 
-              {/* Expandable calculations & analysis */}
+              {/* Expandable section */}
               {intervention.reasoning && (
-                <details style={{ marginTop: '0.85rem' }}>
-                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.4rem 0' }}>
+                <details style={{ marginTop: '1rem' }}>
+                  <summary style={{ 
+                    cursor: 'pointer', 
+                    fontSize: '0.9rem', 
+                    fontWeight: '600', 
+                    color: 'rgb(99, 102, 241)', 
+                    padding: '0.875rem 1rem',
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    transition: 'all 0.2s ease',
+                    listStyle: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(99, 102, 241, 0.15)'
+                    e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.4)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(99, 102, 241, 0.08)'
+                    e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 0.2)'
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ flexShrink: 0, transition: 'transform 0.2s ease' }}>
+                      <path d="M6 9l6 6 6-6"/>
+                    </svg>
                     Calculations & Analysis
                   </summary>
-                  <div style={{ marginTop: '0.6rem', padding: '0.65rem', background: 'rgba(17, 24, 39, 0.3)', borderRadius: '6px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                  <div style={{ 
+                    marginTop: '1rem', 
+                    padding: '1rem', 
+                    background: 'rgba(17, 24, 39, 0.4)', 
+                    borderRadius: '8px', 
+                    fontSize: '0.9rem', 
+                    lineHeight: '1.7', 
+                    color: 'rgba(255, 255, 255, 0.85)',
+                    border: '1px solid rgba(255, 255, 255, 0.05)'
+                  }}>
                     {baselineAverage && simulationStats && (
-                      <div style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(99, 102, 241, 0.15)', borderRadius: '4px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
-                        <strong>Grid Analysis:</strong> Based on spatial modeling, this intervention results in approximately{' '}
-                        <strong style={{ color: 'var(--text-primary)' }}>
-                          {Math.abs(((baselineAverage - simulationStats.avgValue) / baselineAverage) * 100).toFixed(1)}%
-                        </strong>{' '}
-                        {((baselineAverage - simulationStats.avgValue) / baselineAverage) < 0 ? 'citywide baseline increase' : 'citywide baseline decrease'}.
+                      <div style={{ 
+                        marginBottom: '1rem', 
+                        padding: '0.875rem', 
+                        background: 'rgba(99, 102, 241, 0.12)', 
+                        borderRadius: '6px', 
+                        borderLeft: '3px solid rgb(99, 102, 241)' 
+                      }}>
+                        <div style={{ marginBottom: '0.5rem' }}>
+                          <strong style={{ color: 'rgb(99, 102, 241)', fontSize: '0.85rem' }}>Grid Analysis</strong>
+                        </div>
+                        <div style={{ fontSize: '0.9rem', lineHeight: '1.7' }}>
+                          Based on spatial modeling, this intervention results in approximately{' '}
+                          <strong style={{ color: 'rgba(255, 255, 255, 0.95)' }}>
+                            {Math.abs(((baselineAverage - simulationStats.avgValue) / baselineAverage) * 100).toFixed(1)}%
+                          </strong>{' '}
+                          {((baselineAverage - simulationStats.avgValue) / baselineAverage) < 0 ? 'citywide baseline increase' : 'citywide baseline decrease'}.
+                        </div>
                       </div>
                     )}
-                    {intervention.reasoning}
+                    <div style={{ fontSize: '0.9rem', lineHeight: '1.7' }}>
+                      {intervention.reasoning}
+                    </div>
                   </div>
 
-                  {/* Secondary impacts inside calculations section */}
+                  {/* Secondary impacts */}
                   {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
-                    <div style={{ marginTop: '0.85rem' }}>
-                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
+                    <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(17, 24, 39, 0.4)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                      <h4 style={{ 
+                        fontSize: '0.85rem', 
+                        fontWeight: '700', 
+                        color: 'rgba(255, 255, 255, 0.9)', 
+                        marginBottom: '0.75rem'
+                      }}>
                         Secondary Impacts
                       </h4>
-                      <ul style={{ marginTop: '0.4rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                      <ul style={{ margin: 0, paddingLeft: '1.5rem', fontSize: '0.9rem', lineHeight: '1.7', color: 'rgba(255, 255, 255, 0.8)' }}>
                         {intervention.secondary_impacts.map((impact, i) => (
-                          <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
+                          <li key={i} style={{ marginBottom: '0.5rem', paddingLeft: '0.25rem' }}>{impact}</li>
                         ))}
                       </ul>
                     </div>

@@ -908,6 +908,11 @@ body::after {
     padding: 2rem;
 }
 
+/* Details/Summary Arrow Animation */
+details[open] summary svg {
+    transform: rotate(180deg);
+}
+
 .intervention-summary {
     padding: 1rem 1.25rem;
     background: rgba(59, 130, 246, 0.05);
