@@ -68,14 +68,14 @@ export function formatEmissionIntensity(value, unit = 'metric') {
 
 /**
  * Format annual emissions with proper units
- * @param {number} tons - Value in metric tons
+ * @param {number} tons - Value in metric tons (annual)
  * @param {string} unit - 'metric' or 'imperial'
  * @param {boolean} abbreviated - Use K for thousands
  * @returns {string} Formatted string
  */
 export function formatAnnualEmissions(tons, unit = 'metric', abbreviated = true) {
   const converted = convertAnnualEmissions(tons, unit);
-  const unitLabel = unit === 'imperial' ? 'tons' : 'tonnes'; // US tons vs metric tonnes
+  const unitLabel = unit === 'imperial' ? 'tons CO₂' : 'tonnes CO₂'; // US tons vs metric tonnes
 
   if (abbreviated) {
     if (Math.abs(converted) >= 1000000) {
@@ -86,6 +86,33 @@ export function formatAnnualEmissions(tons, unit = 'metric', abbreviated = true)
   }
 
   return `${converted.toLocaleString()} ${unitLabel}`;
+}
+
+/**
+ * Format emissions with time period support (daily or annual)
+ * @param {number} annualTons - Value in metric tons per year
+ * @param {string} unit - 'metric' or 'imperial'
+ * @param {string} timePeriod - 'daily' or 'annual'
+ * @param {boolean} abbreviated - Use K for thousands
+ * @returns {string} Formatted string with proper units and commas
+ */
+export function formatEmissionsWithPeriod(annualTons, unit = 'metric', timePeriod = 'annual', abbreviated = true) {
+  // Convert to daily if needed (using 365.25 to account for leap years)
+  const DAYS_PER_YEAR = 365.25;
+  const tons = timePeriod === 'daily' ? annualTons / DAYS_PER_YEAR : annualTons;
+  const converted = convertAnnualEmissions(tons, unit);
+  const unitLabel = unit === 'imperial' ? 'tons CO₂' : 'tonnes CO₂';
+  const periodLabel = timePeriod === 'daily' ? '/day' : '/year';
+
+  if (abbreviated) {
+    if (Math.abs(converted) >= 1000000) {
+      return `${(converted / 1000000).toFixed(1)}M ${unitLabel}${periodLabel}`;
+    } else if (Math.abs(converted) >= 1000) {
+      return `${(converted / 1000).toFixed(1)}K ${unitLabel}${periodLabel}`;
+    }
+  }
+
+  return `${Math.round(converted).toLocaleString()} ${unitLabel}${periodLabel}`;
 }
 
 /**
@@ -186,7 +213,7 @@ export function getUnitLabel(type, unit = 'metric') {
  * @param {string} unit - 'metric' or 'imperial'
  */
 export function saveUnitPreference(unit) {
-  localStorage.setItem('co2unt_unit_preference', unit);
+  localStorage.setItem('carboniq_unit_preference', unit);
 }
 
 /**
@@ -194,6 +221,6 @@ export function saveUnitPreference(unit) {
  * @returns {string} 'metric' or 'imperial' (defaults to metric)
  */
 export function loadUnitPreference() {
-  return localStorage.getItem('co2unt_unit_preference') || 'metric';
+  return localStorage.getItem('carboniq_unit_preference') || 'metric';
 }
 

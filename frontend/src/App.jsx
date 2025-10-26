@@ -7,10 +7,10 @@ import Logo from './Logo'
 import './conversation-styles.css'
 import './intro.css'
 import './draggable.css'
-import './logo.css'
 import {
   formatEmissionIntensity,
   formatAnnualEmissions,
+  formatEmissionsWithPeriod,
   getLegendRanges,
   formatLegendRange,
   getMarkerColor as getMarkerColorWithUnit,
@@ -259,6 +259,9 @@ function IntroScreen({ onStart, isFadingOut }) {
   return (
     <div className={`intro-screen ${isFadingOut ? 'fade-out' : ''}`}>
       <div className="intro-content">
+        <div className="intro-logo" style={{ marginBottom: '2rem' }}>
+          <Logo size="xlarge" />
+        </div>
         <h1 className="intro-title">
           {typedTitle}
           {typedTitle && typedTitle.length < title.length && cursorVisible && <span className="cursor">|</span>}
@@ -329,7 +332,9 @@ function App() {
   const [prompt, setPrompt] = useState('')
   const [loading, setLoading] = useState(false)
   const [baseline, setBaseline] = useState(null)
+  const [baselineMetadata, setBaselineMetadata] = useState(null)
   const [simulation, setSimulation] = useState(null)
+  const [simulationStats, setSimulationStats] = useState(null) // Store simulation stats separately
   const [intervention, setIntervention] = useState(null)
   const [statistics, setStatistics] = useState(null)
   const [error, setError] = useState(null)
@@ -349,6 +354,17 @@ function App() {
   
   // Unit system preference
   const [unitSystem, setUnitSystem] = useState(() => loadUnitPreference())
+  
+  // Time period preferences (daily/annual) - independent for each section
+  const [gridStatsTimePeriod, setGridStatsTimePeriod] = useState(() => {
+    const saved = localStorage.getItem('carboniq_grid_time_period')
+    return saved || 'annual'
+  })
+  
+  const [intervSummaryTimePeriod, setIntervSummaryTimePeriod] = useState(() => {
+    const saved = localStorage.getItem('carboniq_interv_time_period')
+    return saved || 'annual'
+  })
   
   // Draggable sidebar state
   const [sidebarPosition, setSidebarPosition] = useState(() => {
@@ -394,6 +410,26 @@ function App() {
     const newUnit = event.target.value
     setUnitSystem(newUnit)
     saveUnitPreference(newUnit)
+  }
+  
+  const handleGridStatsTimePeriodChange = (event) => {
+    const newPeriod = event.target.value
+    setGridStatsTimePeriod(newPeriod)
+    localStorage.setItem('carboniq_grid_time_period', newPeriod)
+  }
+  
+  const handleIntervSummaryTimePeriodChange = (event) => {
+    const newPeriod = event.target.value
+    setIntervSummaryTimePeriod(newPeriod)
+    localStorage.setItem('carboniq_interv_time_period', newPeriod)
+  }
+  
+  const handleConvHistoryTimePeriodChange = (index, newPeriod) => {
+    setConversationHistory(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], timePeriod: newPeriod }
+      return updated
+    })
   }
   
   // Draggable sidebar handlers
@@ -476,6 +512,7 @@ function App() {
       
       const data = await response.json()
       setBaseline(data.grid)
+      setBaselineMetadata(data.metadata)
       setIsBackendConnected(true)
     } catch (error) {
       console.error('Error loading baseline:', error)
@@ -521,6 +558,18 @@ function App() {
         console.warn('[CARBONIQ] No statistics data received from backend')
       }
       
+      // Calculate actual overall percentage change from grid averages
+      const simStats = computeStats(simulationData)
+      setSimulationStats(simStats) // Store simulation stats separately for persistent display
+      const actualOverallChangePercent = baselineAverage && simStats
+        ? ((baselineAverage - simStats.avgValue) / baselineAverage) * 100
+        : 0
+      
+      // Calculate actual total emissions saved based on grid data
+      // IMPORTANT: Use baselineMetadata (not simulation metadata) for accurate baseline
+      const baselineTotalAnnual = baselineMetadata?.annual_emissions_tonnes || 0
+      const actualAnnualSavings = baselineTotalAnnual * (actualOverallChangePercent / 100)
+      
       // Add to conversation history
       const newConversation = {
         id: Date.now(),
@@ -529,7 +578,10 @@ function App() {
         simulation: simulationData,
         intervention: interventionData,
         statistics: statisticsData,
-        view: 'simulation'
+        actualOverallChangePercent: actualOverallChangePercent, // Store actual calculated change
+        actualAnnualSavings: actualAnnualSavings, // Store actual savings in tonnes/year
+        view: 'simulation',
+        timePeriod: 'annual' // Initialize with default time period
       }
       
       setConversationHistory(prev => [...prev, newConversation])
@@ -546,6 +598,7 @@ function App() {
     if (!conversation) return
     
     setSimulation(conversation.simulation)
+    setSimulationStats(computeStats(conversation.simulation)) // Recompute stats from stored simulation
     setIntervention(conversation.intervention)
     setStatistics(conversation.statistics)
     setCurrentView(conversation.view)
@@ -557,6 +610,7 @@ function App() {
       setConversationHistory([])
       setActiveConversationIndex(null)
       setSimulation(null)
+      setSimulationStats(null)
       setIntervention(null)
       setStatistics(null)
       setCurrentView('baseline')
@@ -590,6 +644,7 @@ function App() {
       } else {
         // No conversations left, go back to baseline
         setSimulation(null)
+        setSimulationStats(null)
         setIntervention(null)
         setStatistics(null)
         setCurrentView('baseline')
@@ -782,22 +837,50 @@ function App() {
                 <p className="conversation-prompt">{conv.prompt}</p>
                 {conv.statistics && (
                   <div className="conversation-stats">
-                    {conv.statistics?.is_unrelated ? (
+                    {conv.statistics?.is_unrelated || Math.abs(conv.actualOverallChangePercent || 0) === 0 ? (
                       <>
-                        <span className="stat-badge neutral">0%</span>
-                        <span className="stat-value neutral">No climate impact</span>
+                        <span className="stat-badge neutral">0.0%</span>
+                        <span className="stat-value neutral">{conv.statistics?.is_unrelated ? 'No climate impact' : 'No Significant Reduction'}</span>
                       </>
                     ) : (
                       <>
-                        <span className={`stat-badge ${conv.statistics?.is_increase ? 'warning' : 'success'}`}>
-                          {conv.statistics?.is_increase ? '+' : '-'}{conv.statistics?.percentage_reduction || 0}%
+                        <span className={`stat-badge ${(() => {
+                          const percent = conv.actualOverallChangePercent;
+                          if (percent < 0) return 'increase'; // Negative = emissions increased (red)
+                          if (percent > 25) return 'high-reduction'; // >25% = high reduction (dark green)
+                          if (percent > 10) return 'medium-reduction'; // 10-25% = medium reduction (medium green)
+                          return 'low-reduction'; // 0-10% = low reduction (light green)
+                        })()}`}>
+                          {Math.abs(conv.actualOverallChangePercent || 0) === 0 ? '0.0' : `${conv.actualOverallChangePercent < 0 ? '+' : '−'}${Math.abs(conv.actualOverallChangePercent || 0).toFixed(1)}`}%
                         </span>
-                        <span className="stat-value">
-                          {conv.statistics?.is_increase
-                            ? `${formatAnnualEmissions(Math.abs(conv.statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} added`
-                            : `${formatAnnualEmissions(Math.abs(conv.statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} saved`
-                          }
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <span className={`stat-value ${conv.actualOverallChangePercent < 0 ? 'increase' : 'decrease'}`}>
+                            {conv.actualOverallChangePercent < 0
+                              ? `${formatEmissionsWithPeriod(Math.abs(conv.actualAnnualSavings || 0), unitSystem, conv.timePeriod || 'annual', true)} added`
+                              : `${formatEmissionsWithPeriod(Math.abs(conv.actualAnnualSavings || 0), unitSystem, conv.timePeriod || 'annual', true)} saved`
+                            }
+                          </span>
+                          <select 
+                            value={conv.timePeriod || 'annual'} 
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleConvHistoryTimePeriodChange(index, e.target.value);
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            style={{ 
+                              fontSize: '0.6rem', 
+                              padding: '0.1rem 0.25rem', 
+                              borderRadius: '3px',
+                              border: '1px solid rgba(255,255,255,0.3)',
+                              background: 'rgba(17, 24, 39, 0.8)',
+                              color: 'rgba(255, 255, 255, 0.9)',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="daily" style={{ background: '#1f2937', color: '#fff' }}>Daily</option>
+                            <option value="annual" style={{ background: '#1f2937', color: '#fff' }}>Annual</option>
+                          </select>
+                        </div>
                       </>
                     )}
                   </div>
@@ -812,7 +895,7 @@ function App() {
       <header className="header premium-header slide-in-down">
         <div className="header-content">
           <div className="header-left">
-            <Logo size="small" />
+            <Logo size="large" />
             <div className="header-text">
               <h1 className="title">CarbonIQ</h1>
               <p className="subtitle">AI-Powered Climate Impact Simulator for NYC</p>
@@ -828,6 +911,15 @@ function App() {
                 <option value="metric">Metric</option>
                 <option value="imperial">Imperial</option>
               </select>
+            </div>
+            
+            <div className="unit-selector glass-morphism" title={unitSystem === 'metric' ? '1 tonne = 1,000 kg' : '1 ton = 2,000 lbs'} style={{ cursor: 'help', padding: '0.5rem 0.75rem' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span style={{ fontSize: '0.95rem', marginLeft: '0.3rem', whiteSpace: 'nowrap', fontWeight: '500' }}>
+                {unitSystem === 'metric' ? '1 tonne = 1,000 kg' : '1 ton = 2,000 lbs'}
+              </span>
             </div>
             
           </div>
@@ -896,7 +988,12 @@ function App() {
         {/* Map Container */}
         <div className="map-section glass">
           <div className="map-header">
-            <h2 className="section-title">Emissions Visualization</h2>
+            <h2 className="section-title">
+              Emissions Visualization 
+              <span style={{ fontSize: '1.1rem', fontWeight: '400', opacity: 0.8, marginLeft: '0.5rem' }}>
+                ({unitSystem === 'imperial' ? 'CO₂/mi²/day' : 'CO₂/km²/day'})
+              </span>
+            </h2>
             <div className="view-controls">
               <button 
                 className={`view-btn ${currentView === 'baseline' ? 'active' : ''}`}
@@ -973,18 +1070,33 @@ function App() {
             <div className="stat-card glass">
               <h3 className="stat-card-title">Grid Statistics</h3>
               <p style={{ fontSize: '0.85rem', opacity: 0.8, marginBottom: '1rem', lineHeight: '1.4' }}>
-                Coverage: ~{unitSystem === 'imperial' ? '868 mi²' : '2,249 km²'} grid (NYC + water bodies). Values are emission intensities ({unitSystem === 'imperial' ? 'tons CO₂/mi²/day' : 'tonnes CO₂/km²/day'}).
-                Aligned with NYC GHG inventory benchmarks.
+                {baselineMetadata ? (
+                  <>
+                    Coverage: ~{unitSystem === 'imperial' 
+                      ? `${Math.round(baselineMetadata.coverage_area_km2 * 0.386102)} mi²` 
+                      : `${Math.round(baselineMetadata.coverage_area_km2)} km²`} (NYC boundaries).{' '}
+                    {baselineMetadata.datapoints.toLocaleString()} datapoints, each ~{baselineMetadata.cell_area_km2.toFixed(2)} km².{' '}
+                    Calibrated to NYC GHG inventory (~{
+                      unitSystem === 'imperial'
+                        ? `${((baselineMetadata.annual_emissions_tonnes * 1.10231131) / 1_000_000).toFixed(1)}M tons/year`
+                        : `${(baselineMetadata.annual_emissions_tonnes / 1_000_000).toFixed(1)}M tonnes/year`
+                    }).
+                  </>
+                ) : (
+                  <>
+                    Calibrated to NYC GHG inventory benchmarks.
+                  </>
+                )}
               </p>
               <div className="stat-grid" style={{ gridTemplateColumns: intervention?.grid_impact?.affected_area_km2 ? 'repeat(2, 1fr)' : 'repeat(2, 1fr)' }}>
                 <div className="stat-item">
-                  <span className="stat-label">
-                    Average per {unitSystem === 'imperial' ? 'mi²' : 'km²'}
+                  <span className="stat-label" style={{ fontSize: '0.9rem', fontWeight: '600' }}>
+                    Average Intensity (per {unitSystem === 'imperial' ? 'mi²' : 'km²'}/day)
                     {intervention?.grid_impact && (
                       <span className="stat-sublabel"> (Baseline)</span>
                     )}
                   </span>
-                  <span className="stat-value">{formatEmissionIntensity((displayStats?.avgValue) || 0, unitSystem)}</span>
+                  <span className="stat-value" style={{ fontSize: '1.2rem', fontWeight: '700' }}>{formatEmissionIntensity((displayStats?.avgValue) || 0, unitSystem)}</span>
                   {intervention?.grid_impact && (
                     <>
                       <span className="stat-sublabel">After Intervention</span>
@@ -998,13 +1110,68 @@ function App() {
                   )}
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label">Data Points</span>
-                  <span className="stat-value">{displayStats?.dataPoints?.toLocaleString() || '0'}</span>
+                  <span className="stat-label" style={{ fontSize: '0.9rem', fontWeight: '600' }}>Data Points</span>
+                  <span className="stat-value" style={{ fontSize: '1.2rem', fontWeight: '700' }}>{displayStats?.dataPoints?.toLocaleString() || '0'}</span>
                 </div>
+                {baselineMetadata && (
+                  <div className="stat-item" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gridColumn: '1 / -1' }}>
+                    <span className="stat-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'center', fontSize: '0.95rem', fontWeight: '600' }}>
+                      <span>Total Citywide</span>
+                      <select 
+                        value={gridStatsTimePeriod} 
+                        onChange={handleGridStatsTimePeriodChange} 
+                        style={{ 
+                          fontSize: '0.7rem', 
+                          padding: '0.15rem 0.3rem', 
+                          borderRadius: '4px',
+                          border: '1px solid rgba(255,255,255,0.3)',
+                          background: 'rgba(17, 24, 39, 0.8)',
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="daily" style={{ background: '#1f2937', color: '#fff' }}>Daily</option>
+                        <option value="annual" style={{ background: '#1f2937', color: '#fff' }}>Annual</option>
+                      </select>
+                      {currentView === 'simulation' && (
+                        <span className="stat-sublabel"> (Baseline)</span>
+                      )}
+                    </span>
+                    <span className="stat-value" style={{ fontSize: '1.3rem', fontWeight: '700', marginTop: '0.4rem' }}>
+                      {formatEmissionsWithPeriod(
+                        baselineMetadata.annual_emissions_tonnes || 0,
+                        unitSystem,
+                        gridStatsTimePeriod,
+                        true
+                      )}
+                    </span>
+                    {currentView === 'simulation' && baselineAverage && displayStats && (
+                      <>
+                        <span className="stat-sublabel" style={{ fontSize: '0.85rem', marginTop: '0.6rem' }}>After Intervention</span>
+                        <span className="stat-value-secondary" style={{ fontSize: '1.15rem', fontWeight: '600', marginTop: '0.2rem' }}>
+                          {(() => {
+                            const percentChange = ((baselineAverage - displayStats.avgValue) / baselineAverage) * 100
+                            const simulatedTotal = baselineMetadata.annual_emissions_tonnes * (1 - percentChange / 100)
+                            return formatEmissionsWithPeriod(
+                              simulatedTotal,
+                              unitSystem,
+                              gridStatsTimePeriod,
+                              true
+                            )
+                          })()}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
                 {intervention?.grid_impact?.affected_area_km2 && (
                   <div className="stat-item">
                     <span className="stat-label">Affected Area</span>
-                    <span className="stat-value">{intervention.grid_impact.affected_area_km2.toFixed(1)} km²</span>
+                    <span className="stat-value">{
+                      unitSystem === 'imperial' 
+                        ? `${(intervention.grid_impact.affected_area_km2 * 0.386102).toFixed(1)} mi²`
+                        : `${intervention.grid_impact.affected_area_km2.toFixed(1)} km²`
+                    }</span>
                   </div>
                 )}
               </div>
@@ -1021,52 +1188,94 @@ function App() {
               <h3 className="stat-card-title">Intervention Summary</h3>
 
               {/* Brief summary */}
-              <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '8px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
-                <p style={{ margin: 0, fontSize: '0.95rem', lineHeight: '1.5' }}>{intervention.description}</p>
+              <div style={{ marginBottom: '0.85rem', padding: '0.65rem', background: 'rgba(99, 102, 241, 0.1)', borderRadius: '8px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
+                <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.5', fontWeight: '500' }}>{intervention.description}</p>
               </div>
 
               {/* Average change percentage - calculated from actual grid data */}
-              {statistics && baselineAverage && displayStats && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Average Emission Change</span>
+              {baselineAverage && simulationStats && baselineMetadata && (
+                <div style={{ marginBottom: '0.85rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', fontWeight: '600' }}>Overall Citywide Impact</span>
                     {(() => {
-                      // Calculate actual percentage change from grid averages
-                      const percentChange = ((baselineAverage - displayStats.avgValue) / baselineAverage) * 100
+                      // Calculate actual percentage change from grid averages (always baseline vs simulation)
+                      const percentChange = ((baselineAverage - simulationStats.avgValue) / baselineAverage) * 100
+                      const absPercent = Math.abs(percentChange)
+                      const isZero = absPercent < 0.05 // Treat anything < 0.05% as 0
                       const isIncrease = percentChange < 0
+                      
+                      if (isZero) {
+                        return (
+                          <span className="stat-value" style={{ fontSize: '1.35rem', fontWeight: '700', color: 'var(--text-muted)' }}>
+                            0.0%
+                          </span>
+                        )
+                      }
+                      
                       return (
-                        <span className={`stat-value ${isIncrease ? 'increase' : 'decrease'}`} style={{ fontSize: '1.5rem', fontWeight: '600' }}>
-                          {isIncrease ? '+' : '−'}{Math.abs(percentChange).toFixed(1)}%
+                        <span className={`stat-value ${isIncrease ? 'increase' : 'decrease'}`} style={{ fontSize: '1.35rem', fontWeight: '700' }}>
+                          {isIncrease ? '+' : '−'}{absPercent.toFixed(1)}%
                         </span>
                       )
                     })()}
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                    {statistics?.is_increase
-                      ? `${formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} added per year`
-                      : `${formatAnnualEmissions(Math.abs(statistics?.annual_savings_tons_co2 || 0), unitSystem, true)} saved per year`
-                    }
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontWeight: '500' }}>
+                    <span>
+                      {(() => {
+                        const percentChange = ((baselineAverage - simulationStats.avgValue) / baselineAverage) * 100
+                        const actualSavings = baselineMetadata.annual_emissions_tonnes * (percentChange / 100)
+                        const isIncrease = percentChange < 0
+                        return isIncrease
+                          ? `${formatEmissionsWithPeriod(Math.abs(actualSavings), unitSystem, intervSummaryTimePeriod, true)} added`
+                          : `${formatEmissionsWithPeriod(Math.abs(actualSavings), unitSystem, intervSummaryTimePeriod, true)} saved`
+                      })()}
+                    </span>
+                    <select 
+                      value={intervSummaryTimePeriod} 
+                      onChange={handleIntervSummaryTimePeriodChange} 
+                      style={{ 
+                        fontSize: '0.65rem', 
+                        padding: '0.15rem 0.3rem', 
+                        borderRadius: '4px',
+                        border: '1px solid rgba(255,255,255,0.3)',
+                        background: 'rgba(17, 24, 39, 0.8)',
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="daily" style={{ background: '#1f2937', color: '#fff' }}>Daily</option>
+                      <option value="annual" style={{ background: '#1f2937', color: '#fff' }}>Annual</option>
+                    </select>
                   </div>
                 </div>
               )}
 
               {/* Expandable calculations & analysis */}
               {intervention.reasoning && (
-                <details style={{ marginTop: '1rem' }}>
-                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
+                <details style={{ marginTop: '0.85rem' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.4rem 0' }}>
                     Calculations & Analysis
                   </summary>
-                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(17, 24, 39, 0.3)', borderRadius: '6px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                  <div style={{ marginTop: '0.6rem', padding: '0.65rem', background: 'rgba(17, 24, 39, 0.3)', borderRadius: '6px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                    {baselineAverage && simulationStats && (
+                      <div style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(99, 102, 241, 0.15)', borderRadius: '4px', borderLeft: '3px solid rgb(99, 102, 241)' }}>
+                        <strong>Grid Analysis:</strong> Based on spatial modeling, this intervention results in approximately{' '}
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {Math.abs(((baselineAverage - simulationStats.avgValue) / baselineAverage) * 100).toFixed(1)}%
+                        </strong>{' '}
+                        {((baselineAverage - simulationStats.avgValue) / baselineAverage) < 0 ? 'citywide baseline increase' : 'citywide baseline decrease'}.
+                      </div>
+                    )}
                     {intervention.reasoning}
                   </div>
 
                   {/* Secondary impacts inside calculations section */}
                   {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
-                    <div style={{ marginTop: '1rem' }}>
-                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                    <div style={{ marginTop: '0.85rem' }}>
+                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.4rem' }}>
                         Secondary Impacts
                       </h4>
-                      <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                      <ul style={{ marginTop: '0.4rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
                         {intervention.secondary_impacts.map((impact, i) => (
                           <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
                         ))}
@@ -1102,6 +1311,34 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* Footer */}
+      <footer style={{
+        width: '100%',
+        padding: '1rem 2rem',
+        background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(10px)',
+        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: '12px',
+        fontSize: '0.75rem',
+        color: 'var(--text-muted)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.25rem',
+        lineHeight: '1.4',
+        boxSizing: 'border-box'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: '600', color: 'var(--text-secondary)' }}>Powered by:</span>
+          <span>Claude API (Anthropic)</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: '600', color: 'var(--text-secondary)', flexShrink: 0 }}>Data Sources:</span>
+          <span style={{ lineHeight: '1.5' }}>
+            NYC Open Data, Port Authority of NY & NJ, FAA, EPA, ICAO, NYISO, Con Edison, NYC DEP, NY DMV, NYC TLC, MTA
+          </span>
+        </div>
+      </footer>
     </div>
   )
 }

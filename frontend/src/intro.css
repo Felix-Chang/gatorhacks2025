@@ -45,6 +45,34 @@
     padding: 2rem;
 }
 
+.intro-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: logoFloat 3s ease-in-out infinite, fadeInScale 0.8s ease-out;
+    filter: drop-shadow(0 10px 40px rgba(59, 130, 246, 0.4));
+}
+
+@keyframes logoFloat {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
 .intro-title {
     font-size: 6rem;
     font-weight: 800;
@@ -249,6 +277,11 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
+    .intro-logo img {
+        width: 120px !important;
+        height: 120px !important;
+    }
+    
     .intro-title {
         font-size: 3.5rem;
     }
@@ -273,6 +306,11 @@
 }
 
 @media (max-width: 480px) {
+    .intro-logo img {
+        width: 100px !important;
+        height: 100px !important;
+    }
+    
     .intro-title {
         font-size: 2.5rem;
     }

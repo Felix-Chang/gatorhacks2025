@@ -12,6 +12,15 @@ from datetime import datetime, timedelta
 import json
 import os
 
+# Import geopandas for accurate boundary checking
+try:
+    import geopandas as gpd
+    from shapely.geometry import Point
+    GEOPANDAS_AVAILABLE = True
+except ImportError:
+    GEOPANDAS_AVAILABLE = False
+    print("[WARN] geopandas not available, using rectangular boundaries")
+
 # Import data loader for real data integration
 try:
     from data_loader import get_data_loader
@@ -45,17 +54,44 @@ class NYCEmissionsData:
         'Staten Island': {'center': (40.5795, -74.1502), 'intensity': 0.7}
     }
     
-    def __init__(self, grid_resolution=50):
+    def __init__(self, grid_resolution=None):
         """
-        Initialize with specified grid resolution
+        Initialize with calculated grid resolution for ~1 km² cells
         
         Args:
-            grid_resolution: Number of points per dimension (50 = 2500 grid points)
+            grid_resolution: Number of points per dimension (auto-calculated if None)
         """
-        self.grid_resolution = grid_resolution
+        # Calculate grid resolution for ~1 km² cells
+        if grid_resolution is None:
+            # At 40.7°N latitude:
+            # 1 degree latitude ≈ 111 km
+            # 1 degree longitude ≈ 85 km (111 * cos(40.7°))
+            lat_range = self.BOUNDS['north'] - self.BOUNDS['south']  # ~0.43 degrees
+            lon_range = self.BOUNDS['east'] - self.BOUNDS['west']    # ~0.56 degrees
+            
+            # Calculate cells needed for 1 km spacing
+            lat_km = lat_range * 111  # ~47.7 km
+            lon_km = lon_range * 85   # ~47.6 km
+            
+            # Use ~48 cells per dimension for ~1 km² cells
+            self.grid_resolution = int(max(lat_km, lon_km)) + 1
+            print(f"[GRID] Auto-calculated resolution: {self.grid_resolution}x{self.grid_resolution} for ~1 km² cells")
+        else:
+            self.grid_resolution = grid_resolution
+        
         self.baseline_cache = None
         self.last_update = None
         self.openaq_cache = None
+        self.nyc_boundaries = None
+        
+        # Calculate grid cell area (in km²)
+        lat_step = (self.BOUNDS['north'] - self.BOUNDS['south']) / self.grid_resolution
+        lon_step = (self.BOUNDS['east'] - self.BOUNDS['west']) / self.grid_resolution
+        self.cell_area_km2 = (lat_step * 111) * (lon_step * 111 * np.cos(np.radians(40.7)))
+        print(f"[GRID] Cell area: {self.cell_area_km2:.4f} km² per cell")
+        
+        # Load NYC borough boundaries from GeoJSON
+        self._load_nyc_boundaries()
         
         # Initialize data loader for real data
         self.data_loader = None
@@ -68,6 +104,37 @@ class NYCEmissionsData:
         
         # Generate baseline on initialization
         self._generate_baseline()
+    
+    def _load_nyc_boundaries(self):
+        """Load NYC borough boundaries from GeoJSON for accurate polygon-based filtering"""
+        if not GEOPANDAS_AVAILABLE:
+            print("[WARN] geopandas not available, will use rectangular boundaries")
+            return
+        
+        try:
+            # Path to borough boundaries GeoJSON
+            boundaries_path = os.path.join('data', 'raw', 'boundaries', 'borough_boundaries.geojson')
+            
+            if not os.path.exists(boundaries_path):
+                print(f"[WARN] Borough boundaries file not found: {boundaries_path}")
+                return
+            
+            # Load GeoJSON
+            self.nyc_boundaries = gpd.read_file(boundaries_path)
+            
+            # Ensure it's in WGS84 (EPSG:4326) for lat/lon
+            if self.nyc_boundaries.crs != 'EPSG:4326':
+                self.nyc_boundaries = self.nyc_boundaries.to_crs('EPSG:4326')
+            
+            # Combine all boroughs into single geometry for faster checking
+            self.nyc_boundary_union = self.nyc_boundaries.unary_union
+            
+            print(f"[OK] Loaded NYC boundaries: {len(self.nyc_boundaries)} boroughs")
+            print(f"[BOUNDS] Using actual GeoJSON polygons for precise filtering")
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to load borough boundaries: {e}")
+            self.nyc_boundaries = None
     
     def _generate_baseline(self):
         """
@@ -144,15 +211,16 @@ class NYCEmissionsData:
         cell_area_km2 = (lat_step * 111) * (lon_step * 111 * np.cos(np.radians(40.7)))  # ~111km per degree latitude
         print(f"[GRID] Cell area: {cell_area_km2:.4f} km² ({self.grid_resolution}x{self.grid_resolution} = {self.grid_resolution**2} cells)")
         
-        # RESCALED TO MATCH NYC INVENTORY BENCHMARKS
-        # Target: 75,000-100,000 tonnes/day citywide (mid-range of 50k-150k)
-        # Average per km²: 75-125 tonnes/km²/day
+        # CALIBRATED TO MATCH NYC ACTUAL INVENTORY
+        # Target: ~150,000-160,000 tonnes/day citywide (55M tonnes/year)
+        # Average per km²: ~116 tonnes/km²/day
+        # Based on: NYC GHG Inventory 2023 (~50-60M tonnes CO₂e/year)
         
-        # 1. AIRPORTS - Peak hotspots (500-2,500 tonnes/km²/day at center)
+        # 1. AIRPORTS - Peak hotspots (scaled to match actual emissions)
         print("[REAL-DATA] Adding airport emissions hotspots...")
         airports = [
-            {'name': 'JFK', 'lat': 40.6413, 'lon': -73.7781, 'peak_density_tonne_km2_day': 1500},  # 1,500 metric tonnes/km²/day peak
-            {'name': 'LaGuardia', 'lat': 40.7769, 'lon': -73.8740, 'peak_density_tonne_km2_day': 1000}  # 1,000 metric tonnes/km²/day peak
+            {'name': 'JFK', 'lat': 40.6413, 'lon': -73.7781, 'peak_density_tonne_km2_day': 1800},  # 1,800 metric tonnes/km²/day peak
+            {'name': 'LaGuardia', 'lat': 40.7769, 'lon': -73.8740, 'peak_density_tonne_km2_day': 1200}  # 1,200 metric tonnes/km²/day peak
         ]
         
         for airport in airports:
@@ -174,12 +242,12 @@ class NYCEmissionsData:
                                 intensity = np.exp(-distance**2 / (2 * (radius_cells/3.0)**2))
                                 emissions_grid[ni, nj] += peak_density * intensity
         
-        # 2. MANHATTAN HOTSPOTS - High-density commercial (100-150 tonnes/km²/day)
+        # 2. MANHATTAN HOTSPOTS - High-density commercial (scaled +17%)
         print("[REAL-DATA] Adding Manhattan urban hotspots...")
         hotspots = [
-            {'name': 'Midtown/Times Square', 'lat': 40.758, 'lon': -73.9855, 'emissions_tonne_km2_day': 140, 'radius': 3},
-            {'name': 'Financial District', 'lat': 40.7074, 'lon': -74.0113, 'emissions_tonne_km2_day': 125, 'radius': 2},
-            {'name': 'Upper West Side', 'lat': 40.7870, 'lon': -73.9754, 'emissions_tonne_km2_day': 110, 'radius': 2},
+            {'name': 'Midtown/Times Square', 'lat': 40.758, 'lon': -73.9855, 'emissions_tonne_km2_day': 164, 'radius': 3},
+            {'name': 'Financial District', 'lat': 40.7074, 'lon': -74.0113, 'emissions_tonne_km2_day': 146, 'radius': 2},
+            {'name': 'Upper West Side', 'lat': 40.7870, 'lon': -73.9754, 'emissions_tonne_km2_day': 129, 'radius': 2},
         ]
         
         for hotspot in hotspots:
@@ -216,12 +284,12 @@ class NYCEmissionsData:
                     emissions_grid[i, j] = max(5, emissions_grid[i, j] * 0.05)
 
         # Ensure minimum emissions (parks, low-activity areas)
-        emissions_grid = np.maximum(emissions_grid, 4)  # 4 tonnes/km²/day minimum
+        emissions_grid = np.maximum(emissions_grid, 5)  # 5 tonnes/km²/day minimum (scaled +17%)
         
         # Calculate and report citywide total for verification
         total_emissions_tonnes_day = np.sum(emissions_grid * cell_area_km2)
         print(f"[VERIFY] Citywide total: {total_emissions_tonnes_day:,.0f} tonnes/day")
-        print(f"[VERIFY] Target range: 100,000-300,000 tonnes/day")
+        print(f"[VERIFY] Target: ~150,000-160,000 tonnes/day (55M tonnes/year)")
         print(f"[VERIFY] Average per km²: {np.mean(emissions_grid):,.0f} tonnes/km²/day")
         print(f"[VERIFY] Median per km²: {np.median(emissions_grid):,.0f} tonnes/km²/day")
         print(f"[VERIFY] Peak per km²: {np.max(emissions_grid):,.0f} tonnes/km²/day")
@@ -261,9 +329,10 @@ class NYCEmissionsData:
     def _calculate_baseline_urban_emission(self, lat: float, lon: float) -> float:
         """
         Calculate baseline urban emission intensity based on borough proximity
-        Target: Average 40-75 tonnes/km²/day for typical urban areas (adjusted for citywide total)
+        Calibrated to match NYC's actual ~55M tonnes/year inventory
+        Target: Average ~116 tonnes/km²/day citywide
         """
-        base_emission = 25  # Base urban emission (25 tonnes CO₂/km²/day)
+        base_emission = 29  # Base urban emission (29 tonnes CO₂/km²/day, scaled +17%)
 
         # Calculate distance to each borough center and apply intensity
         total_intensity = 0
@@ -274,16 +343,16 @@ class NYCEmissionsData:
             # Euclidean distance (simplified, not geodesic)
             distance = np.sqrt((lat - center_lat)**2 + (lon - center_lon)**2)
 
-            # Inverse distance weighting with falloff
+            # Inverse distance weighting with falloff (scaled +17%)
             if distance < 0.05:
                 # Very close to borough center: high emissions
-                contribution = intensity * 40
+                contribution = intensity * 47
             elif distance < 0.15:
                 # Near borough center
-                contribution = intensity * 25 / (distance * 10 + 1)
+                contribution = intensity * 29 / (distance * 10 + 1)
             else:
                 # Outer areas
-                contribution = intensity * 15 / (distance * 20 + 1)
+                contribution = intensity * 18 / (distance * 20 + 1)
 
             total_intensity += contribution
 
@@ -520,17 +589,26 @@ class NYCEmissionsData:
     def get_baseline_grid(self) -> List[Tuple[float, float, float]]:
         """
         Returns baseline grid as list of (lat, lon, value) tuples
+        Filters to only include points within NYC boundaries
         """
         if self.baseline_cache is None:
             self._generate_baseline()
         
         lats, lons, emissions = self.baseline_cache
         
-        # Convert to list of points
+        # Convert to list of points, filtering to NYC boundaries only
         points = []
+        filtered_count = 0
         for i, lat in enumerate(lats):
             for j, lon in enumerate(lons):
-                points.append((lat, lon, emissions[i, j]))
+                if self._is_in_nyc_boundaries(lat, lon):
+                    points.append((lat, lon, emissions[i, j]))
+                else:
+                    filtered_count += 1
+        
+        if filtered_count > 0:
+            print(f"[FILTER] Removed {filtered_count} points outside NYC boundaries")
+            print(f"[FILTER] Kept {len(points)} points within NYC (from {len(lats)*len(lons)} total)")
         
         return points
     
@@ -561,11 +639,12 @@ class NYCEmissionsData:
                 'percentage_reduction': 0,
                 'is_unrelated': True
             }
-            # Return baseline unchanged
+            # Return baseline unchanged, filtered to NYC boundaries
             points = []
             for i, lat in enumerate(lats):
                 for j, lon in enumerate(lons):
-                    points.append((lat, lon, baseline_emissions[i, j]))
+                    if self._is_in_nyc_boundaries(lat, lon):
+                        points.append((lat, lon, baseline_emissions[i, j]))
             return points
 
         geographic_modifications = intervention.get('geographic_modifications', [])
@@ -635,11 +714,12 @@ class NYCEmissionsData:
                             variation = 1.0 + (pattern_intensity - 0.5) * 0.2
                             modified_emissions[i, j] *= variation
         
-        # Convert to list of points
+        # Convert to list of points, filtering to NYC boundaries only
         points = []
         for i, lat in enumerate(lats):
             for j, lon in enumerate(lons):
-                points.append((lat, lon, modified_emissions[i, j]))
+                if self._is_in_nyc_boundaries(lat, lon):
+                    points.append((lat, lon, modified_emissions[i, j]))
         
         return points
     
@@ -1038,20 +1118,61 @@ class NYCEmissionsData:
         
         return emissions
     
+    def _is_in_nyc_boundaries(self, lat: float, lon: float) -> bool:
+        """
+        Check if point is within ANY NYC borough boundary using GeoJSON polygons
+        Falls back to rectangular boundaries if GeoJSON not available
+        """
+        # Use actual GeoJSON polygons if available
+        if self.nyc_boundaries is not None and GEOPANDAS_AVAILABLE:
+            point = Point(lon, lat)  # Shapely uses (lon, lat) order
+            return self.nyc_boundary_union.contains(point)
+        
+        # Fallback: Use rectangular boundaries (less accurate)
+        # Define tightened NYC borough boundaries
+        # Format: (min_lat, max_lat, min_lon, max_lon)
+        borough_bounds = {
+            'Manhattan': (40.70, 40.88, -74.019, -73.907),
+            'Brooklyn': (40.57, 40.74, -74.042, -73.833),
+            'Queens': (40.54, 40.80, -73.962, -73.70),
+            'Bronx': (40.785, 40.92, -73.933, -73.765),
+            'Staten Island': (40.495, 40.651, -74.255, -74.053)
+        }
+        
+        # Check if point is in any borough
+        for borough, (min_lat, max_lat, min_lon, max_lon) in borough_bounds.items():
+            if min_lat <= lat <= max_lat and min_lon <= lon <= max_lon:
+                return True
+        
+        return False
+    
     def _is_in_target_area(self, lat: float, lon: float, target: str) -> bool:
         """
-        Check if point is in target borough using precise boundaries
+        Check if point is in target borough using GeoJSON polygons
+        Falls back to rectangular boundaries if GeoJSON not available
         """
         if target.lower() == 'citywide' or target.lower() == 'all':
             return True
         
-        # Define precise borough boundaries
+        # Use actual GeoJSON polygons if available
+        if self.nyc_boundaries is not None and GEOPANDAS_AVAILABLE:
+            point = Point(lon, lat)
+            
+            # Check each borough
+            for idx, row in self.nyc_boundaries.iterrows():
+                borough_name = row.get('boro_name', row.get('name', '')).lower()
+                if target.lower() in borough_name or borough_name in target.lower():
+                    return row['geometry'].contains(point)
+            
+            return False
+        
+        # Fallback: Use rectangular boundaries
         borough_bounds = {
-            'Manhattan': (40.70, 40.80, -74.02, -73.93),
-            'Brooklyn': (40.57, 40.70, -74.05, -73.82),
-            'Queens': (40.54, 40.80, -74.05, -73.70),
-            'Bronx': (40.78, 40.92, -73.95, -73.77),
-            'Staten Island': (40.49, 40.65, -74.26, -74.05)
+            'Manhattan': (40.70, 40.88, -74.019, -73.907),
+            'Brooklyn': (40.57, 40.74, -74.042, -73.833),
+            'Queens': (40.54, 40.80, -73.962, -73.70),
+            'Bronx': (40.785, 40.92, -73.933, -73.765),
+            'Staten Island': (40.495, 40.651, -74.255, -74.053)
         }
         
         if target in borough_bounds:
@@ -1059,6 +1180,10 @@ class NYCEmissionsData:
             return min_lat <= lat <= max_lat and min_lon <= lon <= max_lon
         
         return True  # Default: apply citywide
+    
+    def get_cell_area_km2(self) -> float:
+        """Returns the area of each grid cell in km²"""
+        return self.cell_area_km2
     
     def get_last_update_time(self) -> str:
         """Returns timestamp of last data update"""

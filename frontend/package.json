@@ -1,6 +1,6 @@
 {
-  "name": "co2unt",
-  "description": "CO₂UNT - AI-Powered Climate Impact Simulator for NYC",
+  "name": "carboniq",
+  "description": "CarbonIQ - AI-Powered Climate Impact Simulator for NYC",
   "private": true,
   "version": "1.0.0",
   "type": "module",

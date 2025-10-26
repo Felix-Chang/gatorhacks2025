@@ -705,14 +705,15 @@ body::after {
 }
 
 .stat-card {
-    padding: 2rem;
+    padding: 1.75rem;
+    min-height: auto;
 }
 
 .stat-card-title {
     font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
 }
 
 /* Featured Stats */
@@ -853,17 +854,32 @@ body::after {
 }
 
 .stat-label {
-    font-size: 0.875rem;
+    font-size: 0.95rem;
     color: var(--text-muted);
+    font-weight: 500;
 }
 
 .stat-value {
-    font-size: 1rem;
+    font-size: 1.25rem;
     font-weight: 600;
     color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.stat-value.decrease {
+    color: var(--success);
+}
+
+.stat-value.increase {
+    color: #ef4444;
+}
+
+.stat-value-secondary {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
 }
 
 .stat-disclaimer {

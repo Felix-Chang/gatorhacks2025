@@ -49,26 +49,33 @@ SECTOR ANNUAL BASELINES (tons CO2/year):
 - Energy/Grid: ~21,000,000 tons/year
 - Trees: -14,359 tons/year (negative = sequestration)
 
+YOUR ROLE: ANALYSIS, NOT CALCULATION
+- Your "reasoning" should explain HOW and WHY the intervention works, NOT calculate totals
+- The spatial grid model automatically calculates citywide impacts from your geographic modifications
+- Focus on: mechanisms, affected sectors, geographic rationale, implementation details
+- DO NOT: mention citywide percentages, total tonnes reduced, or overall impact numbers
+
 CRITICAL ANALYSIS RULES:
 1. Use REAL NYC geography (JFK is in Queens, not Manhattan!)
-2. Calculate based on ACTUAL fleet sizes and usage patterns
+2. Base analysis on ACTUAL fleet sizes and usage patterns
 3. Account for secondary effects (EVs increase grid load by ~7 MWh/vehicle/year)
 4. Be CONSERVATIVE - real-world deployment takes time
 5. Flag unrealistic interventions (>50% fleet conversion in <5 years is unlikely)
 6. Consider infrastructure constraints (charging stations, grid capacity)
 7. Account for implementation costs and timelines
 
-Your task: Analyze user climate interventions and provide REALISTIC, DATA-DRIVEN predictions with geographic-specific modification instructions.
+Your task: Analyze user climate interventions and provide REALISTIC, DATA-DRIVEN geographic modification instructions.
 
 CRITICAL: Output ONLY valid JSON. Use plain numbers WITHOUT commas (write 51025 not 51,025). No markdown, no extra text.
 
 Output with this exact structure:
 {
+  "is_unrelated": false,
   "summary": "Brief 1-sentence description of the intervention",
   "borough": "Manhattan|Brooklyn|Queens|Bronx|Staten Island|citywide",
   "sector": "transport|buildings|aviation|industry|energy|nature",
   "subsector": "taxis|buses|commercial|residential|etc",
-  "direction": "decrease|increase",
+  "direction": "decrease|increase|none",
   "baseline_emissions_tons_year": 425000,
   "reduced_emissions_tons_year": 389125,
   "annual_impact_tons_co2": 35875,
@@ -81,12 +88,30 @@ Output with this exact structure:
   "geographic_hotspots": [
     {"lat": 40.7589, "lon": -73.9857, "name": "Times Square", "intensity": 1.0}
   ],
-  "reasoning": "Detailed step-by-step calculation explanation showing how you arrived at each geographic modification",
+  "reasoning": "ANALYSIS ONLY - Explain how the intervention works and why geographic areas are impacted. Example: 'Manhattan has ~13,500 yellow taxis traveling ~70,000 miles/year each. Converting 30% to EVs eliminates direct tailpipe emissions in Manhattan's dense commercial areas. The geographic modifications reflect concentrated taxi activity in Midtown and Lower Manhattan, with smaller impacts in outer boroughs where taxis are less common.' DO NOT mention citywide totals or overall percentages.",
   "secondary_impacts": [
     "Increased grid demand: +28,350 MWh/year (+9,923 tons CO2 from grid)",
     "Need for 180 new Level 2 charging stations"
   ],
   "confidence_level": "high|medium|low"
+}
+
+For unrelated/vague prompts, return:
+{
+  "is_unrelated": true,
+  "summary": "Unrelated query - no climate impact",
+  "borough": "citywide",
+  "sector": "none",
+  "direction": "none",
+  "baseline_emissions_tons_year": 0,
+  "reduced_emissions_tons_year": 0,
+  "annual_impact_tons_co2": 0,
+  "average_change_percent": 0,
+  "geographic_modifications": [],
+  "geographic_hotspots": [],
+  "reasoning": "This prompt is too vague or unrelated to climate interventions",
+  "secondary_impacts": [],
+  "confidence_level": "low"
 }
 
 IMPORTANT INSTRUCTIONS FOR GEOGRAPHIC MODIFICATIONS:
@@ -98,12 +123,30 @@ IMPORTANT INSTRUCTIONS FOR GEOGRAPHIC MODIFICATIONS:
 - Example: Converting Manhattan taxis to EVs would have high impact in Manhattan (-20%), moderate in other boroughs (-8%)
 - Example: SAF at JFK would have very high impact at JFK hotspot (-30%), minimal citywide (-2%)
 
-CURRENT BASELINE VALUES:
-- Average citywide: ~64.7 tonnes CO2/km²/day
-- Airport hotspots (JFK): ~1,500 tonnes CO2/km²/day
-- Airport hotspots (LaGuardia): ~1,000 tonnes CO2/km²/day
-- Manhattan commercial: ~100-150 tonnes CO2/km²/day
-- Citywide minimum: ~4 tonnes CO2/km²/day"""
+CURRENT NYC BASELINE DATA:
+Grid Coverage: 1,327 km² of NYC land + water (each cell ~0.98 km²)
+Total Annual Emissions: ~55.4 million tonnes CO₂/year
+Daily Average: ~151,781 tonnes CO₂/day
+Average Intensity: ~114 tonnes CO₂/km²/day
+
+Spatial Distribution:
+- Airport hotspots (JFK): ~1,500-1,800 tonnes CO₂/km²/day
+- Airport hotspots (LaGuardia): ~800-1,200 tonnes CO₂/km²/day
+- Manhattan commercial: ~100-150 tonnes CO₂/km²/day
+- Urban residential: ~40-80 tonnes CO₂/km²/day
+- Parks/water: ~5-15 tonnes CO₂/km²/day
+- Citywide minimum: ~5 tonnes CO₂/km²/day
+
+NYC Sector Breakdown (from city inventory):
+- Buildings (heating/cooling): ~70% of emissions (~38.8M tonnes/year)
+- Transportation: ~25% (~13.8M tonnes/year)
+  - Private vehicles: ~8M tonnes/year
+  - Taxis/rideshare: ~425K tonnes/year
+  - Buses: ~800K tonnes/year
+  - Aviation (JFK+LGA): ~4.5M tonnes/year
+- Other: ~5% (~2.8M tonnes/year)
+
+IMPORTANT: Use these actual NYC values to inform your emission calculations. Your baseline_emissions_tons_year and reduced_emissions_tons_year should align with these sector totals when relevant."""
     
     # Real NYC geographic data for AI analysis
     NYC_LANDMARKS = {
@@ -137,7 +180,7 @@ CURRENT BASELINE VALUES:
                 import anthropic
                 self.claude_client = anthropic.Anthropic(api_key=anthropic_key)
                 self.use_claude = True
-                print("[OK] ✨ Claude client initialized for advanced emissions analysis")
+                print("[OK] Claude client initialized for advanced emissions analysis")
             except ImportError as e:
                 print(f"[ERROR] Failed to import anthropic module: {e}")
                 print(f"[ERROR] Run: pip install anthropic")
@@ -190,7 +233,17 @@ CURRENT BASELINE VALUES:
 
 USER REQUEST: "{prompt}"
 
-Provide a realistic analysis considering:
+FIRST: Check if this is a VALID climate intervention request:
+- Is it specific enough to be actionable? (vague single-word prompts like "blue", "green", "red", "black" are NOT valid)
+- Does it relate to emissions, energy, transport, buildings, or environmental systems?
+- Can it realistically be implemented in NYC?
+
+If the request is too vague, nonsensical, or unrelated to climate/emissions:
+- Set "is_unrelated" to true
+- Set all numeric values to 0
+- Set direction to "none"
+
+Otherwise, provide a realistic analysis considering:
 1. What specifically changes (which assets, how many, where)
 2. Current baseline emissions for that subsector
 3. Realistic reduction/increase percentage
@@ -204,7 +257,7 @@ Be specific with numbers and locations. Use actual NYC geography."""
             message = self.claude_client.messages.create(
                 model="claude-3-haiku-20240307",  # Claude 3 Haiku (available with current API key)
                 max_tokens=2000,
-                temperature=0.3,  # Lower for more accurate/consistent results
+                temperature=0.0,  # Set to 0 for deterministic/consistent results
                 system=self.CLAUDE_SYSTEM_PROMPT,
                 messages=[{
                     "role": "user",
@@ -248,9 +301,12 @@ Be specific with numbers and locations. Use actual NYC geography."""
                 else:
                     raise
 
-            print(f"[CLAUDE] ✓ Analysis complete: {analysis.get('summary', 'N/A')}")
+            print(f"[CLAUDE] Analysis complete: {analysis.get('summary', 'N/A')}")
             print(f"[CLAUDE] Confidence: {analysis.get('confidence_level', 'unknown')}, Average change: {analysis.get('average_change_percent', 0)}%")
 
+            # Check if Claude marked this as unrelated
+            is_unrelated = analysis.get("is_unrelated", False)
+            
             # Map Claude's response to our intervention format
             intervention = {
                 # Core fields
@@ -259,6 +315,7 @@ Be specific with numbers and locations. Use actual NYC geography."""
                 "subsector": analysis.get("subsector"),
                 "direction": analysis.get("direction", "decrease"),
                 "description": analysis.get("summary", "Climate intervention"),
+                "is_unrelated": is_unrelated,
 
                 # Geographic modifications (NEW - this is the key change!)
                 "geographic_modifications": analysis.get("geographic_modifications", []),
@@ -679,14 +736,14 @@ Be specific about NYC landmarks, neighborhoods, and geographic features."""
         
         # VERY STRICT: Must have BOTH action AND sector, OR just be specific enough
         # Examples that should pass:
-        # - "reduce emissions" (action + sector) ✓
-        # - "add solar panels" (action + sector) ✓
-        # - "JFK emissions" (specific location + sector) ✓
+        # - "reduce emissions" (action + sector)
+        # - "add solar panels" (action + sector)
+        # - "JFK emissions" (specific location + sector)
         # 
         # Examples that should fail:
-        # - "climate" (no action, no specific sector) ✗
-        # - "climate 30%" (no action, no specific sector) ✗
-        # - "environment" (too vague) ✗
+        # - "climate" (no action, no specific sector)
+        # - "climate 30%" (no action, no specific sector)
+        # - "environment" (too vague)
         
         # If no action verb AND no specific sector, it's unrelated
         if not has_action and not has_sector:
@@ -706,17 +763,19 @@ Be specific about NYC landmarks, neighborhoods, and geographic features."""
         # Even if it has some keywords, check if it's clearly unrelated
         unrelated_patterns = [
             'weather', 'temperature', 'rain', 'snow', 'forecast', 'sunny', 'cloudy',
-            'restaurant', 'food', 'eat', 'drink', 'coffee', 'pizza', 'burger', 'candy', 'gummy',
+            'restaurant', 'food', 'eat', 'drink', 'coffee', 'pizza', 'burger', 'candy', 'gummy', 'bear',
             'movie', 'show', 'entertainment', 'sport', 'game', 'play', 'fun',
             'hello', 'hi', 'hey', 'thanks', 'thank you', 'bye', 'goodbye',
             'joke', 'funny', 'meme', 'story', 'poem', 'song', 'music',
             'shop', 'store', 'buy', 'sell', 'price', 'cost',
-            'people', 'person', 'friend', 'family', 'love', 'hate'
+            'people', 'person', 'friend', 'family', 'love', 'hate',
+            'what', 'when', 'where', 'who', 'why', 'how', 'test', 'testing',
+            'random', 'nonsense', 'asdf', 'qwer', 'xyz', 'abc'
         ]
         
-        # If it has unrelated patterns and weak/no climate context, it's unrelated
+        # If it has unrelated patterns, it's unrelated regardless of other keywords
         has_unrelated = any(pattern in prompt_lower for pattern in unrelated_patterns)
-        if has_unrelated and not (has_action or has_sector):
+        if has_unrelated:
             return True
         
         # Single letter or very short nonsense (< 3 chars)
