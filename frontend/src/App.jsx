@@ -1059,20 +1059,20 @@ function App() {
                   <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(17, 24, 39, 0.3)', borderRadius: '6px', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
                     {intervention.reasoning}
                   </div>
-                </details>
-              )}
 
-              {/* Secondary impacts */}
-              {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
-                <details style={{ marginTop: '1rem' }}>
-                  <summary style={{ cursor: 'pointer', fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', padding: '0.5rem 0' }}>
-                    Secondary Impacts
-                  </summary>
-                  <ul style={{ marginTop: '0.75rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
-                    {intervention.secondary_impacts.map((impact, i) => (
-                      <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
-                    ))}
-                  </ul>
+                  {/* Secondary impacts inside calculations section */}
+                  {intervention.secondary_impacts && intervention.secondary_impacts.length > 0 && (
+                    <div style={{ marginTop: '1rem' }}>
+                      <h4 style={{ fontSize: '0.875rem', fontWeight: '600', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                        Secondary Impacts
+                      </h4>
+                      <ul style={{ marginTop: '0.5rem', marginBottom: 0, paddingLeft: '1.5rem', fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-secondary)' }}>
+                        {intervention.secondary_impacts.map((impact, i) => (
+                          <li key={i} style={{ marginBottom: '0.5rem' }}>{impact}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </details>
               )}
             </div>
